@@ -19,7 +19,6 @@ import { Locale, makeThrows, Title } from '../components/locale.js'
 import { proxy } from '../../../db/proxy.js'
 import { env } from '../../env.js'
 import Script from '../components/script.js'
-import { toSlug } from '../format/slug.js'
 import { BackToLink } from '../components/back-to-link.js'
 import { sweetAlertPlugin } from '../../client-plugins.js'
 import { getAuthUser } from '../auth/user.js'
@@ -31,7 +30,11 @@ let addPageTitle = (
 
 let style = Style(/* css */ `
 #Endpoint {
-
+}
+.api--title {
+  font-weight: bold;
+}
+.api--desc {
 }
 `)
 
@@ -40,9 +43,13 @@ let script = Script(/* js */ `
 
 // replace this array with proxy for database-backed persistence
 // e.g. let items = proxy.endpoint
-let items = [
-  { title: 'Android', slug: 'md' },
-  { title: 'iOS', slug: 'ios' },
+type EndpointItem = {
+  id: number
+  title: string
+  desc: string
+}
+let items: EndpointItem[] = [
+  { id: 1, title: 'Zyphra Account', desc: 'check available tokens credit' },
 ]
 
 function ListPage(attrs: {}, context: Context) {
@@ -55,14 +62,15 @@ function ListPage(attrs: {}, context: Context) {
         <ul>
           {mapArray(items, item => (
             <li>
-              <Link href={`/endpoint/${item.slug}`}>
-                {item.title} ({item.slug})
-              </Link>
+              <Link href={`/endpoints/${item.id}`} class="api--title">
+                {item.title}
+              </Link>{' '}
+              - <span class="api--desc">{item.desc}</span>
             </li>
           ))}
         </ul>
         {user ? (
-          <Link href="/endpoint/add">
+          <Link href="/endpoints/add">
             <button>{addPageTitle}</button>
           </Link>
         ) : (
@@ -90,13 +98,6 @@ let addPageStyle = Style(/* css */ `
 }
 `)
 let addPageScript = Script(/* js */ `
-${toSlug}
-function updateSlugPreview() {
-  if (!addForm.slug) return
-  let value = addForm.slug.value || addForm.slug.placeholder
-  previewSlug.textContent = toSlug(value)
-}
-updateSlugPreview()
 `)
 let addPage = (
   <>
@@ -106,7 +107,7 @@ let addPage = (
       <form
         id="addForm"
         method="POST"
-        action="/endpoint/add/submit"
+        action="/endpoints/add/submit"
         onsubmit="emitForm(event)"
       >
         <div class="field">
@@ -125,33 +126,15 @@ let addPage = (
         </div>
         <div class="field">
           <label>
-            <Locale en="Short URL Code" zh_hk="短網址碼" zh_cn="短网址码" />
-            *:
-            <input
-              name="slug"
-              required
-              placeholder="e.g. alice-in-wonderland"
-              pattern="(\w|-|\.){1,32}"
-              oninput="updateSlugPreview()"
-            />
+            <Locale en="Description" zh_hk="描述" zh_cn="描述" />
+            :
+            <input name="desc" maxlength="200" />
             <p class="hint">
-              (
               <Locale
-                en="1 to 32 characters of: "
-                zh_hk="1 至 32 個字元："
-                zh_cn="1 至 32 个字元："
+                en="(optional, max 200 characters)"
+                zh_hk="(可選，最多 200 個字元)"
+                zh_cn="(可选，最多 200 个字元)"
               />
-              <code>a-z 0-9 - _ .</code>)
-              <br />
-              <Locale
-                en="A unique part of the URL, e.g. "
-                zh_hk="網址的一部分，例如："
-                zh_cn="网址的一部分，例如："
-              />
-              <code>
-                {env.ORIGIN}/endpoint/
-                <i id="previewSlug">alice-in-wonderland</i>
-              </code>
             </p>
           </label>
         </div>
@@ -183,7 +166,7 @@ function AddPage(attrs: {}, context: DynamicContext) {
 
 let submitParser = object({
   title: string({ minLength: 3, maxLength: 50 }),
-  slug: string({ match: /^[\w\-.]{1,32}$/, case: 'lower' }),
+  desc: string({ maxLength: 200 }),
 })
 
 function Submit(attrs: {}, context: DynamicContext) {
@@ -199,16 +182,17 @@ function Submit(attrs: {}, context: DynamicContext) {
     let body = getContextFormBody(context)
     let input = submitParser.parse(body)
     let id = items.push({
+      id: Date.now(),
       title: input.title,
-      slug: input.slug,
+      desc: input.desc ?? '',
     })
-    return <Redirect href={`/endpoint/result?id=${id}`} />
+    return <Redirect href={`/endpoints/result?id=${id}`} />
   } catch (error) {
     throwIfInAPI(error, '#add-message', context)
     return (
       <Redirect
         href={
-          '/endpoint/result?' + new URLSearchParams({ error: String(error) })
+          '/endpoints/result?' + new URLSearchParams({ error: String(error) })
         }
       />
     )
@@ -255,10 +239,7 @@ function handleFieldKeydown(event) {
 }
 `)
 
-function DetailPage(
-  attrs: { item: (typeof items)[0] },
-  context: DynamicContext,
-) {
+function DetailPage(attrs: { item: EndpointItem }, context: DynamicContext) {
   let { item } = attrs
   return (
     <>
@@ -294,7 +275,7 @@ function DetailPage(
             <span class="edit-mode">
               <button
                 type="button"
-                data-url={`/endpoint/${item.slug}/update/title`}
+                data-url={`/endpoints/${item.id}/update/title`}
                 onclick="saveField(this)"
               >
                 <Locale en="Save" zh_hk="保存" zh_cn="保存" />
@@ -305,13 +286,43 @@ function DetailPage(
             </span>
           </dd>
           <dt>
-            <Locale en="Slug" zh_hk="短網址碼" zh_cn="短网址码" />
+            <Locale en="Description" zh_hk="描述" zh_cn="描述" />
           </dt>
-          <dd>
-            <code>{item.slug}</code>
+          <dd
+            class="field inline-edit-field"
+            data-field="desc"
+            data-mode="view"
+          >
+            <span class="view-mode">{item.desc}</span>
+            <span class="edit-mode">
+              <input
+                name="desc"
+                maxlength="200"
+                onkeydown="handleFieldKeydown(event)"
+              />
+            </span>
+            <button
+              type="button"
+              onclick="setEditMode(event, 'edit')"
+              class="view-mode"
+            >
+              <Locale en="Edit" zh_hk="編輯" zh_cn="编辑" />
+            </button>
+            <span class="edit-mode">
+              <button
+                type="button"
+                data-url={`/endpoints/${item.id}/update/desc`}
+                onclick="saveField(this)"
+              >
+                <Locale en="Save" zh_hk="保存" zh_cn="保存" />
+              </button>
+              <button type="button" onclick="setEditMode(event, 'view')">
+                <Locale en="Cancel" zh_hk="取消" zh_cn="取消" />
+              </button>
+            </span>
           </dd>
         </dl>
-        <BackToLink href="/endpoint" title={pageTitle} />
+        <BackToLink href="/endpoints" title={pageTitle} />
       </div>
       {sweetAlertPlugin.node}
       {detailPageScript}
@@ -324,15 +335,15 @@ function UpdateField(attrs: {}, context: WsContext) {
     throw new Error('This endpoint only supports WebSocket')
   }
   try {
-    let slug = context.routerMatch?.params.slug
+    let id = context.routerMatch?.params.id
     let field = context.routerMatch?.params.field
     let value = context.args?.[0] as string
 
     if (!field) throw `Missing field name`
     if (!value) throw `Missing value`
 
-    let itemIndex = items.findIndex(item => item.slug === slug)
-    if (itemIndex === -1) throw `Item not found: ${slug}`
+    let itemIndex = items.findIndex(item => item.id == id)
+    if (itemIndex === -1) throw `Item not found, id: ${id}`
 
     let container = `#DetailEndpoint`
     function commitField(extra?: ServerMessage[]) {
@@ -356,8 +367,9 @@ function UpdateField(attrs: {}, context: WsContext) {
 
     switch (field) {
       case 'title':
-        if (value == slug) {
-          throw `demo validation error: slug cannot be the same as title`
+        value = value.trim()
+        if (!value) {
+          throw `validation error: title cannot be empty`
         }
         items[itemIndex].title = value
         commitField([
@@ -365,6 +377,10 @@ function UpdateField(attrs: {}, context: WsContext) {
           ['update-text', '#DetailEndpoint h1', value],
           ['set-title', 'Details of ' + value],
         ])
+        throw EarlyTerminate
+      case 'desc':
+        items[itemIndex].desc = value
+        commitField()
         throw EarlyTerminate
       default:
         throw `Unknown field: ${field}`
@@ -396,7 +412,7 @@ function SubmitResult(attrs: {}, context: DynamicContext) {
               zh_cn={`你的提交已收到 (#${id})。`}
             />
           </p>
-          <BackToLink href="/endpoint" title={pageTitle} />
+          <BackToLink href="/endpoints" title={pageTitle} />
         </>
       )}
     </div>
@@ -410,15 +426,15 @@ let routes = {
     description: 'TODO',
     node: <ListPage />,
   },
-  '/endpoint/:slug': {
+  '/endpoints/:id': {
     resolve(context) {
-      let slug = context.routerMatch?.params.slug
-      let item = items.find(item => item.slug === slug)
+      let id = context.routerMatch?.params.id
+      let item = items.find(item => item.id == id)
       if (!item) {
         return {
           title: apiEndpointTitle,
           description: 'Endpoint item not found',
-          node: renderError('Endpoint item not found, slug: ' + slug, context),
+          node: renderError('Endpoint item not found, id: ' + id, context),
         }
       }
       return {
@@ -428,25 +444,25 @@ let routes = {
       }
     },
   },
-  '/endpoint/:slug/update/:field': {
+  '/endpoints/:id/update/:field': {
     title: apiEndpointTitle,
     description: 'TODO',
     node: <UpdateField />,
     streaming: false,
   },
-  '/endpoint/add': {
+  '/endpoints/add': {
     title: <Title t={addPageTitle} />,
     description: 'TODO',
     node: <AddPage />,
     streaming: false,
   },
-  '/endpoint/add/submit': {
+  '/endpoints/add/submit': {
     title: apiEndpointTitle,
     description: 'TODO',
     node: <Submit />,
     streaming: false,
   },
-  '/endpoint/result': {
+  '/endpoints/result': {
     title: apiEndpointTitle,
     description: 'TODO',
     node: <SubmitResult />,
