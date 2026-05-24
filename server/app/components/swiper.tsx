@@ -1,0 +1,233 @@
+import { o } from '../jsx/jsx.js'
+import { NodeList } from '../jsx/types.js'
+import { mapArray } from './fragment.js'
+import { Raw } from './raw.js'
+import Style from './style.js'
+
+export function Swiper(
+  attrs: {
+    id: string
+    initialSlide?: number // default 0
+    style?: string
+    themeColor?: string
+    width?: string | number
+    height?: string | number
+    interval?: number
+    showArrow?: boolean
+    showPagination?: boolean
+    keepTallest?: boolean
+    maxHeight?: string // default "unset !important"
+  } & (
+    | {
+        slides: NodeList
+        images?: never
+      }
+    | {
+        slides?: never
+        images: NodeList
+      }
+  ),
+) {
+  let css = /* css */ `
+.swiper {
+  transition: max-height 0.3s;
+  --swiper-theme-color: var(--ion-color-primary);
+}
+.swiper-wrapper {
+  transition: transform 0.3s;
+}
+.swiper-pagination-bullet {
+  cursor: pointer;
+}
+`
+  let maxHeight = attrs.maxHeight ?? 'unset !important'
+  if (maxHeight) {
+    css += /* css */ `
+#${attrs.id} {
+  max-height: ${maxHeight};
+}
+`
+  }
+  if (attrs.images) {
+    css += /* css */ `
+.swiper-slide {
+  display: flex;
+}
+.swiper-pagination-images {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  bottom: var(--swiper-pagination-bottom,8px);
+  left: 0;
+  top: var(--swiper-pagination-top,auto);
+  width: 100%;
+}
+.swiper-pagination-images img {
+  width: var(--swiper-pagination-image-size,3rem);
+  height: var(--swiper-pagination-image-size,3rem);
+  object-fit: cover;
+}
+.swiper-pagination-image {
+  display: inline-flex;
+  cursor: pointer;
+  margin: 0 var(--swiper-pagination-image-horizontal-gap,4px);
+  opacity: var(--swiper-pagination-image-inactive-opacity,.5);
+}
+.swiper-pagination-image-active {
+  opacity: var(--swiper-pagination-image-opacity,1);
+}
+`
+  }
+  let styles: string[] = []
+  if (attrs.width) styles.push('width:' + toSize(attrs.width))
+  if (attrs.height) styles.push('height:' + toSize(attrs.height))
+  if (attrs.themeColor) styles.push('--swiper-theme-color:' + attrs.themeColor)
+  if (attrs.style) styles.push(attrs.style)
+
+  let setupArgs: (string | number)[] = [
+    `document.getElementById('${attrs.id}')`,
+    attrs.initialSlide || 0,
+  ]
+  if (attrs.interval) {
+    setupArgs.push(attrs.interval)
+  }
+
+  return (
+    <>
+      <link rel="stylesheet" href="/npm/swiper/swiper-bundle.min.css" />
+      {Style(css)}
+      <div id={attrs.id} class="swiper" style={styles.join(';')}>
+        <div class="swiper-wrapper">
+          {mapArray(attrs.slides || attrs.images, content => (
+            <div class="swiper-slide">{content}</div>
+          ))}
+        </div>
+        {attrs.showPagination ? (
+          attrs.images ? (
+            <div class="swiper-pagination swiper-pagination-images swiper-pagination-horizontal">
+              {mapArray(attrs.images, (slide, i) => (
+                <span
+                  class="swiper-pagination-image"
+                  onclick={`swiperSlide(this, '${i}')`}
+                >
+                  {slide}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div class="swiper-pagination swiper-pagination-bullets swiper-pagination-horizontal">
+              {mapArray(attrs.slides, (slide, i) => (
+                <span
+                  class="swiper-pagination-bullet"
+                  onclick={`swiperSlide(this, '${i}')`}
+                ></span>
+              ))}
+            </div>
+          )
+        ) : null}
+        {attrs.showArrow ? (
+          <>
+            <div class="swiper-button-prev" onclick="swiperSlide(this, -1)">
+              <svg
+                class="swiper-navigation-icon"
+                width="11"
+                height="20"
+                viewBox="0 0 11 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M0.38296 20.0762C0.111788 19.805 0.111788 19.3654 0.38296 19.0942L9.19758 10.2796L0.38296 1.46497C0.111788 1.19379 0.111788 0.754138 0.38296 0.482966C0.654131 0.211794 1.09379 0.211794 1.36496 0.482966L10.4341 9.55214C10.8359 9.9539 10.8359 10.6053 10.4341 11.007L1.36496 20.0762C1.09379 20.3474 0.654131 20.3474 0.38296 20.0762Z"
+                  fill="currentColor"
+                ></path>
+              </svg>
+            </div>
+            <div class="swiper-button-next" onclick="swiperSlide(this, +1)">
+              <svg
+                class="swiper-navigation-icon"
+                width="11"
+                height="20"
+                viewBox="0 0 11 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M0.38296 20.0762C0.111788 19.805 0.111788 19.3654 0.38296 19.0942L9.19758 10.2796L0.38296 1.46497C0.111788 1.19379 0.111788 0.754138 0.38296 0.482966C0.654131 0.211794 1.09379 0.211794 1.36496 0.482966L10.4341 9.55214C10.8359 9.9539 10.8359 10.6053 10.4341 11.007L1.36496 20.0762C1.09379 20.3474 0.654131 20.3474 0.38296 20.0762Z"
+                  fill="currentColor"
+                ></path>
+              </svg>
+            </div>
+          </>
+        ) : null}
+      </div>
+      {Raw(/* html */ `
+<script>
+function swiperSlide(swiper, dir) {
+  swiper = swiper.closest('.swiper')
+  let wrapper = swiper.querySelector('.swiper-wrapper')
+  let slides = swiper.querySelectorAll('.swiper-slide')
+  let n = slides.length
+  let index = typeof dir === 'string'
+    ? +dir
+    : ((+wrapper.dataset.index || 0) + dir)
+  index = (index + n) % n
+  wrapper.dataset.index = index
+  wrapper.style.transform = 'translateX(-' + index + '00%)'
+  if (${!(attrs.keepTallest || false)}) {
+    let slide = slides[index]
+    swiper.style.maxHeight = 'auto'
+    let rect = slide.getBoundingClientRect()
+    swiper.style.maxHeight = rect.height + 'px'
+  }
+  swiper.querySelectorAll('.swiper-pagination-bullet').forEach((e, i) => {
+    if (i == index) {
+      e.setAttribute('aria-current', 'true')
+      e.classList.add('swiper-pagination-bullet-active')
+    } else {
+      e.removeAttribute('aria-current')
+      e.classList.remove('swiper-pagination-bullet-active')
+    }
+  })
+  swiper.querySelectorAll('.swiper-pagination-image').forEach((e, i) => {
+    if (i == index) {
+      e.setAttribute('aria-current', 'true')
+      e.classList.add('swiper-pagination-image-active')
+    } else {
+      e.removeAttribute('aria-current')
+      e.classList.remove('swiper-pagination-image-active')
+    }
+  })
+}
+function swiperSetup(swiper, index, interval) {
+  swiperSlide(swiper, String(index))
+  if (!interval) return
+  function autoSlide() {
+    swiperSlide(swiper, +1)
+  }
+  let timer
+  function start() {
+    if (timer) clearInterval(timer)
+    timer = setInterval(autoSlide, interval)
+  }
+  function pause() {
+    clearInterval(timer)
+  }
+  swiper.addEventListener('mouseover', pause)
+  swiper.addEventListener('mouseout', start)
+  window.addEventListener('mousedown', pause)
+  window.addEventListener('mouseup', start)
+  window.addEventListener('touchstart', pause)
+  window.addEventListener('touchend', start)
+  window.addEventListener('touchcancel', start)
+  start()
+}
+swiperSetup(${setupArgs})
+</script>
+`)}
+    </>
+  )
+}
+
+function toSize(size: number | string): string {
+  return typeof size === 'number' ? size + 'px' : size
+}

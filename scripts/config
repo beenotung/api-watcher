@@ -1,0 +1,4 @@
+user=node
+host=api-watcher.cc
+root_dir=/home/node/workspace/github.com/beenotung/api-watcher
+pm2_name="api-watcher"
