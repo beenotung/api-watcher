@@ -66,6 +66,16 @@ let content = (
       />
     </p>
 
+    <p>
+      <Link href="/endpoints">
+        <Locale
+          en="View Endpoints"
+          zh_hk="查看 Endpoints"
+          zh_cn="查看 Endpoints"
+        />
+      </Link>
+    </p>
+
     <SourceCode page="home.tsx" />
   </div>
 )

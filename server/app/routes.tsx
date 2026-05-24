@@ -1,3 +1,4 @@
+import Endpoint from './pages/endpoint.js'
 import ReportContent from './pages/report-content.js'
 import AppNotice from './pages/app-notice.js'
 import AppChat from './pages/app-chat.js'
@@ -81,6 +82,7 @@ export type Routes = Record<string, PageRoute>
 let routeDict = {
   ...ReportContent.routes,
   ...Home.routes,
+  ...Endpoint.routes,
   ...DemoPlugin.routes,
   ...UILanguage.routes,
   ...UserAgents.routes,
