@@ -389,34 +389,27 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
             </span>
             {EditControls({ field: 'code' })}
           </dd>
-          {url ? (
-            <>
-              <dt>Request URL</dt>
-              <dd>
-                <code>{url}</code>
-              </dd>
-            </>
-          ) : null}
-          {init !== emptyObject ? (
-            <>
-              <dt>Request Init</dt>
-              <dd>
-                <code style="white-space: pre-wrap">
-                  {JSON.stringify(init, null, 2)}
-                </code>
-              </dd>
-            </>
-          ) : null}
-          {error ? (
-            <>
-              <dt>
-                <Locale en="Error" zh_hk="Error" zh_cn="Error" />
-              </dt>
-              <dd>
-                <code>{error}</code>
-              </dd>
-            </>
-          ) : null}
+          <details id="request-details" hidden={!url}>
+            <summary>Request Details</summary>
+            <dt>Request URL</dt>
+            <dd>
+              <code id="url-preview">{url}</code>
+            </dd>
+            <dt id="init-preview-label" hidden={init === emptyObject}>
+              Request Init
+            </dt>
+            <dd id="init-preview-container" hidden={init === emptyObject}>
+              <code style="white-space: pre-wrap" id="init-preview">
+                {JSON.stringify(init, null, 2)}
+              </code>
+            </dd>
+          </details>
+          <dt id="error-preview-label" hidden={!error}>
+            <Locale en="Error" zh_hk="Error" zh_cn="Error" />
+          </dt>
+          <dd id="error-preview-container" hidden={!error}>
+            <code id="error-preview">{error}</code>
+          </dd>
         </dl>
         <BackToLink href="/endpoints" title={pageTitle} />
       </div>
@@ -480,7 +473,29 @@ function UpdateField(attrs: {}, context: WsContext) {
         throw EarlyTerminate
       case 'code':
         update(proxy.endpoint, { id }, { code: value })
-        commitField()
+        try {
+          let result = parseCode(value)
+          commitField([
+            ['show', '#request-details'],
+            ['update-text', '#url-preview', result.url],
+            [
+              result.init === emptyObject ? 'hide' : 'show',
+              ['#init-preview-label', '#init-preview-container'],
+            ],
+            [
+              'update-text',
+              '#init-preview',
+              JSON.stringify(result.init, null, 2),
+            ],
+            ['hide', ['#error-preview-label', '#error-preview-container']],
+          ])
+        } catch (error) {
+          commitField([
+            ['hide', '#request-details'],
+            ['show', ['#error-preview-label', '#error-preview-container']],
+            ['update-text', '#error-preview', String(error)],
+          ])
+        }
         throw EarlyTerminate
       default:
         throw `Unknown field: ${field}`
