@@ -16,6 +16,18 @@ where endpoint_id = :endpoint_id
   )
   .pluck()
 
+let select_expected_version = db
+  .prepare<{ endpoint_id: number }, number>(
+    /* sql */ `
+select ifnull(max(version), 0) + 1
+from watch_log
+inner join watch_schedule on watch_schedule.id = watch_log.watch_schedule_id
+where watch_schedule.endpoint_id = :endpoint_id
+  and version is not null
+`,
+  )
+  .pluck()
+
 export function getSchedule(endpoint: Endpoint) {
   let endpoint_id = endpoint.id!
 
@@ -35,13 +47,13 @@ export function getSchedule(endpoint: Endpoint) {
     // not scheduled yet, create a new schedule
     let last_log = getLastWatchLog(endpoint)
     let time_to_wait = last_log ? min_interval : 0
-    console.log('create new schedule:', { time_to_wait, last_log })
+    let expected_version = select_expected_version.get({ endpoint_id })!
     schedule_id = proxy.watch_schedule.push({
       endpoint_id,
       schedule_time: now,
       poll_time: now + time_to_wait,
       delta_duration: min_interval,
-      expected_version: 1,
+      expected_version,
     })
   }
   let schedule = proxy.watch_schedule[schedule_id]
@@ -84,7 +96,7 @@ export function resetSchedule(endpoint: Endpoint) {
 }
 
 let select_last_version = db.prepare<
-  { endpoint_id: number; body: string },
+  { endpoint_id: number },
   { version: number; body: string }
 >(/* sql */ `
 select
@@ -108,13 +120,14 @@ async function poll(schedule: WatchSchedule) {
     let body = await res.text()
     let last_version = select_last_version.get({
       endpoint_id: endpoint.id!,
-      body,
     })
-    let version = !last_version
-      ? 1
-      : last_version.body === body
-        ? last_version.version
-        : last_version.version + 1
+    let version = !res.ok
+      ? null
+      : !last_version
+        ? 1
+        : last_version.body === body
+          ? last_version.version
+          : last_version.version + 1
     let is_new_version = version !== last_version?.version
     proxy.watch_log.push({
       watch_schedule_id: schedule.id!,
