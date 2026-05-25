@@ -645,9 +645,9 @@ function UpdateField(attrs: {}, context: WsContext) {
           ])
         }
         throw EarlyTerminate
-      case 'min_interval':
-        value = String(parseInterval(value))
-        update(proxy.endpoint, { id }, { min_interval: Number(value) })
+      case 'min_interval': {
+        let interval = parseInterval(value)
+        update(proxy.endpoint, { id }, { min_interval: interval })
         commitField([
           [
             'update-text',
@@ -656,9 +656,10 @@ function UpdateField(attrs: {}, context: WsContext) {
           ],
         ])
         throw EarlyTerminate
-      case 'max_interval':
-        value = String(parseInterval(value))
-        update(proxy.endpoint, { id }, { max_interval: Number(value) })
+      }
+      case 'max_interval': {
+        let interval = parseInterval(value)
+        update(proxy.endpoint, { id }, { max_interval: interval })
         commitField([
           [
             'update-text',
@@ -667,6 +668,7 @@ function UpdateField(attrs: {}, context: WsContext) {
           ],
         ])
         throw EarlyTerminate
+      }
       default:
         throw `Unknown field: ${field}`
     }
