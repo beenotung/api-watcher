@@ -246,9 +246,17 @@ function setEditMode(event, mode) {
 
   if (mode === 'edit') {
     // Entering edit mode - copy view mode text to input
-    let value = field.querySelector('.view-mode').textContent.trim()
+    let viewNode = field.querySelector('.view-mode')
+    let value = viewNode.textContent.trim()
     let input = field.querySelector('input, textarea')
-    if (input) input.value = value
+    if (input) {
+      input.value = value
+      if (input.tagName === 'TEXTAREA') {
+        let rect = viewNode.getBoundingClientRect()
+        input.style.height = rect.height + 'px'
+        input.style.width = rect.width + 'px'
+      }
+    }
   }
 
   field.dataset.mode = mode
@@ -372,7 +380,7 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
             <code class="view-mode" style="white-space: pre-wrap">
               {item.code}
             </code>
-            <span class="edit-mode">
+            <span class="edit-mode" style="display: block">
               <textarea
                 name="code"
                 rows="8"
