@@ -147,6 +147,15 @@ accept_time integer NULL
 reject_time integer NULL
 
 
+endpoint
+--------
+id integer PK
+title text
+desc text
+code text
+user_id integer FK >0- user.id
+
+
 # zoom: 1.000
 # view: (0, 0)
 # text-bg: #6495ed
@@ -170,3 +179,4 @@ reject_time integer NULL
 # verification_code (46, 673)
 # verification_attempt (45, 973)
 # content_report (844, 573)
+# endpoint (449, 987)

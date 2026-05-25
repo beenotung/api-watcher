@@ -16,13 +16,14 @@ import { Link, Redirect } from '../components/router.js'
 import { renderError, showError } from '../components/error.js'
 import { EarlyTerminate, MessageException } from '../../exception.js'
 import { Locale, makeThrows, Title } from '../components/locale.js'
-import { proxy } from '../../../db/proxy.js'
+import { Endpoint, proxy } from '../../../db/proxy.js'
 import { env } from '../../env.js'
 import Script from '../components/script.js'
 import { BackToLink } from '../components/back-to-link.js'
 import { sweetAlertPlugin } from '../../client-plugins.js'
 import { getAuthUser } from '../auth/user.js'
 import { emptyObject, parseCode } from '../api/parse.js'
+import { pick, update } from 'better-sqlite3-proxy'
 
 let pageTitle = <Locale en="Endpoints" zh_hk="Endpoints" zh_cn="Endpoints" />
 let addPageTitle = (
@@ -42,25 +43,9 @@ let style = Style(/* css */ `
 let script = Script(/* js */ `
 `)
 
-// replace this array with proxy for database-backed persistence
-// e.g. let items = proxy.endpoint
-type EndpointItem = {
-  id: number
-  title: string
-  desc: string
-  code: string
-}
-let items: EndpointItem[] = [
-  {
-    id: 1,
-    title: 'Zyphra Account',
-    desc: 'check available tokens credit',
-    code: "fetch('https://api.zyphracloud.com/api/v1/account', {\n  credentials: 'include',\n  headers: {\n    'authorization': 'Bearer ...'\n  }\n})",
-  },
-]
-
 function ListPage(attrs: {}, context: Context) {
   let user = getAuthUser(context)
+  let items = pick(proxy.endpoint, ['id', 'title', 'desc', 'code'])
   return (
     <>
       {style}
@@ -209,13 +194,14 @@ function Submit(attrs: {}, context: DynamicContext) {
         zh_hk: '您必須登入才能提交 ' + Locale(pageTitle, context),
         zh_cn: '您必須登入才能提交 ' + Locale(pageTitle, context),
       })
+    let user_id = user!.id!
     let body = getContextFormBody(context)
     let input = submitParser.parse(body)
-    let id = items.push({
-      id: Date.now(),
+    let id = proxy.endpoint.push({
       title: input.title,
       desc: input.desc ?? '',
       code: input.code,
+      user_id,
     })
     return <Redirect href={`/endpoints/result?id=${id}`} />
   } catch (error) {
@@ -280,7 +266,7 @@ function handleFieldKeydown(event) {
 }
 `)
 
-function DetailPage(attrs: { item: EndpointItem }, context: DynamicContext) {
+function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
   let { item } = attrs
   let url: string = ''
   let init: RequestInit = emptyObject
@@ -460,8 +446,8 @@ function UpdateField(attrs: {}, context: WsContext) {
     if (!field) throw `Missing field name`
     if (!value) throw `Missing value`
 
-    let itemIndex = items.findIndex(item => item.id == id)
-    if (itemIndex === -1) throw `Item not found, id: ${id}`
+    if (!((+id) in proxy.endpoint)) throw `Item not found, id: ${id}`
+    id = +id
 
     let container = `#DetailEndpoint`
     function commitField(extra?: ServerMessage[]) {
@@ -489,7 +475,7 @@ function UpdateField(attrs: {}, context: WsContext) {
         if (!value) {
           throw `validation error: title cannot be empty`
         }
-        items[itemIndex].title = value
+        update(proxy.endpoint, { id }, { title: value })
         commitField([
           /* special case also update the page title */
           ['update-text', '#DetailEndpoint h1', value],
@@ -497,11 +483,11 @@ function UpdateField(attrs: {}, context: WsContext) {
         ])
         throw EarlyTerminate
       case 'desc':
-        items[itemIndex].desc = value
+        update(proxy.endpoint, { id }, { desc: value })
         commitField()
         throw EarlyTerminate
       case 'code':
-        items[itemIndex].code = value
+        update(proxy.endpoint, { id }, { code: value })
         commitField()
         throw EarlyTerminate
       default:
@@ -551,7 +537,7 @@ let routes = {
   '/endpoints/:id': {
     resolve(context) {
       let id = context.routerMatch?.params.id
-      let item = items.find(item => item.id == id)
+      let item = proxy.endpoint[+id]
       if (!item) {
         return {
           title: apiEndpointTitle,

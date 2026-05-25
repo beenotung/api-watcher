@@ -139,6 +139,15 @@ export type ContentReport = {
   reject_time: null | number
 }
 
+export type Endpoint = {
+  id?: null | number
+  title: string
+  desc: string
+  code: string
+  user_id: number
+  user?: User
+}
+
 export type DBProxy = {
   method: Method[]
   url: Url[]
@@ -155,6 +164,7 @@ export type DBProxy = {
   verification_attempt: VerificationAttempt[]
   verification_code: VerificationCode[]
   content_report: ContentReport[]
+  endpoint: Endpoint[]
 }
 
 export let proxy = proxySchema<DBProxy>({
@@ -199,6 +209,10 @@ export let proxy = proxySchema<DBProxy>({
       /* foreign references */
       ['reporter', { field: 'reporter_id', table: 'user' }],
       ['reviewer', { field: 'reviewer_id', table: 'user' }],
+    ],
+    endpoint: [
+      /* foreign references */
+      ['user', { field: 'user_id', table: 'user' }],
     ],
   },
 })
