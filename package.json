@@ -53,7 +53,7 @@
     "@ionic/core": "^8.7.18",
     "@mediapipe/tasks-vision": "0.10.22-rc.20250304",
     "argon2": "^0.41.1",
-    "best-effort-json-parser": "^1.4.0",
+    "best-effort-json-parser": "^1.4.1",
     "better-sqlite3-proxy": "^2.11.4",
     "better-sqlite3-schema": "^3.1.10",
     "canvas-confetti": "^1.9.4",
