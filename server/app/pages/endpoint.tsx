@@ -153,6 +153,54 @@ let addPage = (
             </p>
           </label>
         </div>
+        <div class="field">
+          <label>
+            <Locale
+              en="Min Poll Interval"
+              zh_hk="最小輪詢間隔"
+              zh_cn="最小轮询间隔"
+            />
+            :
+            <input
+              name="min_interval"
+              type="number"
+              min="1000"
+              max="86400000"
+              value="60000"
+            />
+            <p class="hint">
+              <Locale
+                en="(in ms, default 60000, range 1s-1d)"
+                zh_hk="(毫秒，默認 60000，範圍 1秒-1天)"
+                zh_cn="(毫秒，默认 60000，范围 1秒-1天)"
+              />
+            </p>
+          </label>
+        </div>
+        <div class="field">
+          <label>
+            <Locale
+              en="Max Poll Interval"
+              zh_hk="最大輪詢間隔"
+              zh_cn="最大轮询间隔"
+            />
+            :
+            <input
+              name="max_interval"
+              type="number"
+              min="1000"
+              max="86400000"
+              value="86400000"
+            />
+            <p class="hint">
+              <Locale
+                en="(in ms, default 86400000, range 1s-1d)"
+                zh_hk="(毫秒，默認 86400000，範圍 1秒-1天)"
+                zh_cn="(毫秒，默认 86400000，范围 1秒-1天)"
+              />
+            </p>
+          </label>
+        </div>
         <input
           type="submit"
           value={<Locale en="Submit" zh_hk="提交" zh_cn="提交" />}
@@ -183,6 +231,8 @@ let submitParser = object({
   title: string({ minLength: 3, maxLength: 50 }),
   desc: string({ maxLength: 200 }),
   code: string({ minLength: 1 }),
+  min_interval: string({ match: /^\d+$/ }),
+  max_interval: string({ match: /^\d+$/ }),
 })
 
 function Submit(attrs: {}, context: DynamicContext) {
@@ -203,6 +253,8 @@ function Submit(attrs: {}, context: DynamicContext) {
       desc: input.desc ?? '',
       code: input.code,
       user_id,
+      min_interval: input.min_interval ? Number(input.min_interval) : 60000,
+      max_interval: input.max_interval ? Number(input.max_interval) : 86400000,
     })
     return <Redirect href={`/endpoints/result?id=${id}`} />
   } catch (error) {

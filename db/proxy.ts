@@ -146,6 +146,30 @@ export type Endpoint = {
   code: string
   user_id: number
   user?: User
+  min_interval: number
+  max_interval: number
+}
+
+export type WatchSchedule = {
+  id?: null | number
+  endpoint_id: number
+  endpoint?: Endpoint
+  schedule_time: number
+  poll_time: number
+  delta_duration: number
+  expected_version: number
+}
+
+export type WatchLog = {
+  id?: null | number
+  watch_schedule_id: number
+  watch_schedule?: WatchSchedule
+  poll_time: number
+  error: null | string
+  status_code: null | number
+  content_type: null | string
+  body: null | string
+  version: number
 }
 
 export type DBProxy = {
@@ -165,6 +189,8 @@ export type DBProxy = {
   verification_code: VerificationCode[]
   content_report: ContentReport[]
   endpoint: Endpoint[]
+  watch_schedule: WatchSchedule[]
+  watch_log: WatchLog[]
 }
 
 export let proxy = proxySchema<DBProxy>({
@@ -213,6 +239,14 @@ export let proxy = proxySchema<DBProxy>({
     endpoint: [
       /* foreign references */
       ['user', { field: 'user_id', table: 'user' }],
+    ],
+    watch_schedule: [
+      /* foreign references */
+      ['endpoint', { field: 'endpoint_id', table: 'endpoint' }],
+    ],
+    watch_log: [
+      /* foreign references */
+      ['watch_schedule', { field: 'watch_schedule_id', table: 'watch_schedule' }],
     ],
   },
 })
