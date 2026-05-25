@@ -22,6 +22,7 @@ import Script from '../components/script.js'
 import { BackToLink } from '../components/back-to-link.js'
 import { sweetAlertPlugin } from '../../client-plugins.js'
 import { getAuthUser } from '../auth/user.js'
+import { emptyObject, parseCode } from '../api/parse.js'
 
 let pageTitle = <Locale en="Endpoints" zh_hk="Endpoints" zh_cn="Endpoints" />
 let addPageTitle = (
@@ -47,9 +48,15 @@ type EndpointItem = {
   id: number
   title: string
   desc: string
+  code: string
 }
 let items: EndpointItem[] = [
-  { id: 1, title: 'Zyphra Account', desc: 'check available tokens credit' },
+  {
+    id: 1,
+    title: 'Zyphra Account',
+    desc: 'check available tokens credit',
+    code: "fetch('https://api.zyphracloud.com/api/v1/account', {\n  credentials: 'include',\n  headers: {\n    'authorization': 'Bearer ...'\n  }\n})",
+  },
 ]
 
 function ListPage(attrs: {}, context: Context) {
@@ -88,9 +95,12 @@ let addPageStyle = Style(/* css */ `
 #AddEndpoint .field {
   margin-block-end: 1rem;
 }
-#AddEndpoint .field label input {
+#AddEndpoint .field label input,
+#AddEndpoint .field label textarea {
   display: block;
   margin-block-start: 0.25rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 #AddEndpoint .field label .hint {
   display: block;
@@ -126,14 +136,33 @@ let addPage = (
         </div>
         <div class="field">
           <label>
-            <Locale en="Description" zh_hk="描述" zh_cn="描述" />
-            :
-            <input name="desc" maxlength="200" />
+            <Locale en="Description" zh_hk="描述" zh_cn="描述" />:
+            <textarea name="desc" rows="2" maxlength="200"></textarea>
             <p class="hint">
               <Locale
                 en="(optional, max 200 characters)"
                 zh_hk="(可選，最多 200 個字元)"
                 zh_cn="(可选，最多 200 个字元)"
+              />
+            </p>
+          </label>
+        </div>
+        <div class="field">
+          <label>
+            <Locale en="Fetch Code" zh_hk="Fetch 程式碼" zh_cn="Fetch 代码" />
+            *:
+            <textarea
+              name="code"
+              rows="8"
+              placeholder={
+                "fetch('https://api.example.com/endpoint', {\n  method: 'GET',\n  headers: { ... }\n})"
+              }
+            ></textarea>
+            <p class="hint">
+              <Locale
+                en="(paste the fetch code from browser dev tools)"
+                zh_hk="(貼上瀏覽器開發者工具中的 fetch 程式碼)"
+                zh_cn="(粘贴浏览器开发者工具中的 fetch 代码)"
               />
             </p>
           </label>
@@ -167,6 +196,7 @@ function AddPage(attrs: {}, context: DynamicContext) {
 let submitParser = object({
   title: string({ minLength: 3, maxLength: 50 }),
   desc: string({ maxLength: 200 }),
+  code: string({ minLength: 1 }),
 })
 
 function Submit(attrs: {}, context: DynamicContext) {
@@ -185,6 +215,7 @@ function Submit(attrs: {}, context: DynamicContext) {
       id: Date.now(),
       title: input.title,
       desc: input.desc ?? '',
+      code: input.code,
     })
     return <Redirect href={`/endpoints/result?id=${id}`} />
   } catch (error) {
@@ -201,24 +232,34 @@ function Submit(attrs: {}, context: DynamicContext) {
 
 let detailPageStyle = Style(/* css */ `
 #DetailEndpoint input[name="title"] { min-width: 12.5rem; }
+#DetailEndpoint dt > * { vertical-align: middle; }
+#DetailEndpoint dt button { margin-inline-start: 0.5rem; }
 `)
 
 let detailPageScript = Script(/* js */ `
 function setEditMode(event, mode) {
-  let field = event.target.closest('.field')
+  let target = event.target
+  let field = target.closest('.field')
+  if (!field) {
+    // button might be in dt, find dd sibling
+    let dt = target.closest('dt')
+    if (dt) {
+      field = dt.nextElementSibling
+    }
+  }
 
   if (mode === 'edit') {
     // Entering edit mode - copy view mode text to input
     let value = field.querySelector('.view-mode').textContent.trim()
-    let input = field.querySelector('input')
-    input.value = value
+    let input = field.querySelector('input, textarea')
+    if (input) input.value = value
   }
 
   field.dataset.mode = mode
 }
 function saveField(button) {
   let field = button.closest('.field')
-  let input = field.querySelector('input')
+  let input = field.querySelector('input, textarea')
   if (!input.checkValidity()) {
     input.reportValidity()
     return
@@ -227,7 +268,7 @@ function saveField(button) {
   emit(button.dataset.url, value)
 }
 function handleFieldKeydown(event) {
-  if (event.key === 'Enter') {
+  if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') {
     event.preventDefault()
     let field = event.target.closest('.field')
     let button = field.querySelector('.edit-mode button:first-child')
@@ -241,6 +282,16 @@ function handleFieldKeydown(event) {
 
 function DetailPage(attrs: { item: EndpointItem }, context: DynamicContext) {
   let { item } = attrs
+  let url: string = ''
+  let init: RequestInit = emptyObject
+  let error: string = ''
+  try {
+    let result = parseCode(item.code)
+    url = result.url
+    init = result.init
+  } catch (e) {
+    error = String(e)
+  }
   return (
     <>
       {detailPageStyle}
@@ -321,6 +372,73 @@ function DetailPage(attrs: { item: EndpointItem }, context: DynamicContext) {
               </button>
             </span>
           </dd>
+          <dt>
+            <Locale en="Code" zh_hk="程式碼" zh_cn="代码" />
+            <button
+              type="button"
+              onclick="setEditMode(event, 'edit')"
+              class="view-mode"
+              data-for="code"
+            >
+              <Locale en="Edit" zh_hk="編輯" zh_cn="编辑" />
+            </button>
+          </dt>
+          <dd
+            class="field inline-edit-field"
+            data-field="code"
+            data-mode="view"
+          >
+            <span class="view-mode" style="white-space: pre-wrap">
+              {item.code}
+            </span>
+            <span class="edit-mode">
+              <textarea
+                name="code"
+                rows="8"
+                onkeydown="handleFieldKeydown(event)"
+              ></textarea>
+            </span>
+            <span class="edit-mode">
+              <button
+                type="button"
+                data-url={`/endpoints/${item.id}/update/code`}
+                onclick="saveField(this)"
+              >
+                <Locale en="Save" zh_hk="保存" zh_cn="保存" />
+              </button>
+              <button type="button" onclick="setEditMode(event, 'view')">
+                <Locale en="Cancel" zh_hk="取消" zh_cn="取消" />
+              </button>
+            </span>
+          </dd>
+          {url ? (
+            <>
+              <dt>Request URL</dt>
+              <dd>
+                <code>{url}</code>
+              </dd>
+            </>
+          ) : null}
+          {init !== emptyObject ? (
+            <>
+              <dt>Request Init</dt>
+              <dd>
+                <pre style="white-space: pre-wrap">
+                  {JSON.stringify(init, null, 2)}
+                </pre>
+              </dd>
+            </>
+          ) : null}
+          {error ? (
+            <>
+              <dt>
+                <Locale en="Error" zh_hk="Error" zh_cn="Error" />
+              </dt>
+              <dd>
+                <code>{error}</code>
+              </dd>
+            </>
+          ) : null}
         </dl>
         <BackToLink href="/endpoints" title={pageTitle} />
       </div>
@@ -380,6 +498,10 @@ function UpdateField(attrs: {}, context: WsContext) {
         throw EarlyTerminate
       case 'desc':
         items[itemIndex].desc = value
+        commitField()
+        throw EarlyTerminate
+      case 'code':
+        items[itemIndex].code = value
         commitField()
         throw EarlyTerminate
       default:

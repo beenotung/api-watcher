@@ -1,3 +1,5 @@
+export const emptyObject = {}
+
 export function parseCode(code: string): { url: string; init: RequestInit } {
   let original_code = code
 
@@ -30,10 +32,12 @@ export function parseCode(code: string): { url: string; init: RequestInit } {
   code = code.slice(end_index + 1).trim()
 
   // parse init option object (optional)
-  let init: RequestInit = {}
+  let init: RequestInit = emptyObject
   if (code.startsWith(',')) {
     code = code.slice(1).trim()
-    init = JSON.parse(code)
+    if (code !== '{}' && code !== '') {
+      init = JSON.parse(code)
+    }
     code = ''
   }
 
