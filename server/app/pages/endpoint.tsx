@@ -24,6 +24,7 @@ import { sweetAlertPlugin } from '../../client-plugins.js'
 import { getAuthUser } from '../auth/user.js'
 import { emptyObject, parseCode } from '../api/parse.js'
 import { pick, update } from 'better-sqlite3-proxy'
+import { Node } from '../jsx/types.js'
 
 let pageTitle = <Locale en="Endpoints" zh_hk="Endpoints" zh_cn="Endpoints" />
 let addPageTitle = (
@@ -287,6 +288,32 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
   } catch (e) {
     error = String(e)
   }
+
+  let editButton = (
+    <button
+      type="button"
+      onclick="setEditMode(event, 'edit')"
+      class="view-mode"
+    >
+      <Locale en="Edit" zh_hk="編輯" zh_cn="编辑" />
+    </button>
+  )
+  function EditControls(attrs: { field: string }) {
+    return (
+      <span class="edit-mode">
+        <button
+          type="button"
+          data-url={`/endpoints/${item.id}/update/${attrs.field}`}
+          onclick="saveField(this)"
+        >
+          <Locale en="Save" zh_hk="保存" zh_cn="保存" />
+        </button>
+        <button type="button" onclick="setEditMode(event, 'view')">
+          <Locale en="Cancel" zh_hk="取消" zh_cn="取消" />
+        </button>
+      </span>
+    )
+  }
   return (
     <>
       {detailPageStyle}
@@ -311,25 +338,8 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
                 onkeydown="handleFieldKeydown(event)"
               />
             </span>
-            <button
-              type="button"
-              onclick="setEditMode(event, 'edit')"
-              class="view-mode"
-            >
-              <Locale en="Edit" zh_hk="編輯" zh_cn="编辑" />
-            </button>
-            <span class="edit-mode">
-              <button
-                type="button"
-                data-url={`/endpoints/${item.id}/update/title`}
-                onclick="saveField(this)"
-              >
-                <Locale en="Save" zh_hk="保存" zh_cn="保存" />
-              </button>
-              <button type="button" onclick="setEditMode(event, 'view')">
-                <Locale en="Cancel" zh_hk="取消" zh_cn="取消" />
-              </button>
-            </span>
+            {editButton}
+            {EditControls({ field: 'title' })}
           </dd>
           <dt>
             <Locale en="Description" zh_hk="描述" zh_cn="描述" />
@@ -347,36 +357,12 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
                 onkeydown="handleFieldKeydown(event)"
               />
             </span>
-            <button
-              type="button"
-              onclick="setEditMode(event, 'edit')"
-              class="view-mode"
-            >
-              <Locale en="Edit" zh_hk="編輯" zh_cn="编辑" />
-            </button>
-            <span class="edit-mode">
-              <button
-                type="button"
-                data-url={`/endpoints/${item.id}/update/desc`}
-                onclick="saveField(this)"
-              >
-                <Locale en="Save" zh_hk="保存" zh_cn="保存" />
-              </button>
-              <button type="button" onclick="setEditMode(event, 'view')">
-                <Locale en="Cancel" zh_hk="取消" zh_cn="取消" />
-              </button>
-            </span>
+            {editButton}
+            {EditControls({ field: 'desc' })}
           </dd>
           <dt>
             <Locale en="Code" zh_hk="程式碼" zh_cn="代码" />
-            <button
-              type="button"
-              onclick="setEditMode(event, 'edit')"
-              class="view-mode"
-              data-for="code"
-            >
-              <Locale en="Edit" zh_hk="編輯" zh_cn="编辑" />
-            </button>
+            {editButton}
           </dt>
           <dd
             class="field inline-edit-field"
@@ -393,18 +379,7 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
                 onkeydown="handleFieldKeydown(event)"
               ></textarea>
             </span>
-            <span class="edit-mode">
-              <button
-                type="button"
-                data-url={`/endpoints/${item.id}/update/code`}
-                onclick="saveField(this)"
-              >
-                <Locale en="Save" zh_hk="保存" zh_cn="保存" />
-              </button>
-              <button type="button" onclick="setEditMode(event, 'view')">
-                <Locale en="Cancel" zh_hk="取消" zh_cn="取消" />
-              </button>
-            </span>
+            {EditControls({ field: 'code' })}
           </dd>
           {url ? (
             <>
