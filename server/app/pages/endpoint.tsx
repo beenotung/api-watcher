@@ -220,6 +220,15 @@ let detailPageStyle = Style(/* css */ `
 #DetailEndpoint input[name="title"] { min-width: 12.5rem; }
 #DetailEndpoint dt > * { vertical-align: middle; }
 #DetailEndpoint dt button { margin-inline-start: 0.5rem; }
+#DetailEndpoint code {
+  background-color: #f0f0f0;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-family: monospace monospace;
+  display: inline-block;
+  max-width: min(120ch, 90vw);
+  overflow-wrap: break-word;
+}
 `)
 
 let detailPageScript = Script(/* js */ `
@@ -374,9 +383,9 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
             data-field="code"
             data-mode="view"
           >
-            <span class="view-mode" style="white-space: pre-wrap">
+            <code class="view-mode" style="white-space: pre-wrap">
               {item.code}
-            </span>
+            </code>
             <span class="edit-mode">
               <textarea
                 name="code"
@@ -409,9 +418,9 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
             <>
               <dt>Request Init</dt>
               <dd>
-                <pre style="white-space: pre-wrap">
+                <code style="white-space: pre-wrap">
                   {JSON.stringify(init, null, 2)}
-                </pre>
+                </code>
               </dd>
             </>
           ) : null}
