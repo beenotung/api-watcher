@@ -413,11 +413,7 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
             {EditControls({ field: 'code' })}
           </dd>
           <dt>
-            <Locale
-              en="Min Poll Interval"
-              zh_hk="最小輪詢間隔"
-              zh_cn="最小轮询间隔"
-            />
+            <Locale en="Description" zh_hk="描述" zh_cn="描述" />
           </dt>
           <dd
             class="field inline-edit-field"
