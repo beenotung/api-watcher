@@ -23,8 +23,8 @@ export function parseInterval(text: string): number {
 
 export function formatInterval(duration_ms: number): string {
   for (let [unit, unit_ms] of intervalUnits) {
-    if (duration_ms >= unit_ms && duration_ms % unit_ms === 0) {
-      return duration_ms / unit_ms + unit
+    if (duration_ms >= unit_ms) {
+      return Math.floor((duration_ms / unit_ms) * 10) / 10 + unit
     }
   }
   return duration_ms + 'ms'

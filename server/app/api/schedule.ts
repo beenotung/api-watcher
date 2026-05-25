@@ -1,5 +1,5 @@
 import { db } from '../../../db/db.js'
-import { Endpoint, proxy, WatchSchedule } from '../../../db/proxy.js'
+import { Endpoint, proxy, WatchLog, WatchSchedule } from '../../../db/proxy.js'
 import { update } from 'better-sqlite3-proxy'
 import { parseCode } from './parse.js'
 
@@ -16,7 +16,7 @@ where endpoint_id = :endpoint_id
   )
   .pluck()
 
-export function checkSchedule(endpoint: Endpoint) {
+export function getSchedule(endpoint: Endpoint) {
   let endpoint_id = endpoint.id!
 
   var { min_interval, max_interval } = endpoint
@@ -33,16 +33,19 @@ export function checkSchedule(endpoint: Endpoint) {
   let schedule_id = select_next_schedule.get({ endpoint_id })
   if (!schedule_id) {
     // not scheduled yet, create a new schedule
+    let last_log = getLastWatchLog(endpoint)
+    let time_to_wait = last_log ? min_interval : 0
+    console.log('create new schedule:', { time_to_wait, last_log })
     schedule_id = proxy.watch_schedule.push({
       endpoint_id,
       schedule_time: now,
-      poll_time: now + min_interval,
+      poll_time: now + time_to_wait,
       delta_duration: min_interval,
       expected_version: 1,
     })
   }
-
   let schedule = proxy.watch_schedule[schedule_id]
+
   let poll_time = schedule.poll_time
   let time_to_wait = poll_time - now
 
@@ -56,6 +59,12 @@ export function checkSchedule(endpoint: Endpoint) {
     )
   }
 
+  return { schedule, time_to_wait }
+}
+
+export function checkSchedule(endpoint: Endpoint) {
+  let { schedule, time_to_wait } = getSchedule(endpoint)
+
   if (time_to_wait > 0) {
     // not yet time to poll
     setTimeout(() => {
@@ -65,6 +74,12 @@ export function checkSchedule(endpoint: Endpoint) {
   }
 
   // time to poll
+  poll(schedule)
+}
+
+export function resetSchedule(endpoint: Endpoint) {
+  let { schedule } = getSchedule(endpoint)
+  schedule.poll_time = Date.now()
   poll(schedule)
 }
 
@@ -125,4 +140,27 @@ async function poll(schedule: WatchSchedule) {
   } finally {
     checkSchedule(endpoint)
   }
+}
+
+let select_last_log = db
+  .prepare<{ endpoint_id: number }, number>(
+    /* sql */ `
+select watch_log.id
+from watch_log
+inner join watch_schedule on watch_schedule.id = watch_log.watch_schedule_id
+where watch_schedule.endpoint_id = :endpoint_id
+order by watch_log.id desc
+limit 1
+`,
+  )
+  .pluck()
+
+export function getLastWatchLog(endpoint: Endpoint): WatchLog | null {
+  let last_log_id = select_last_log.get({ endpoint_id: endpoint.id! })
+  if (!last_log_id) return null
+  return proxy.watch_log[last_log_id]
+}
+
+for (let endpoint of proxy.endpoint) {
+  checkSchedule(endpoint)
 }

@@ -23,8 +23,14 @@ import { sweetAlertPlugin } from '../../client-plugins.js'
 import { getAuthUser } from '../auth/user.js'
 import { emptyObject, parseCode } from '../api/parse.js'
 import { formatInterval, parseInterval } from '../format/interval.js'
-import { pick, update } from 'better-sqlite3-proxy'
-import { checkSchedule } from '../api/schedule.js'
+import { pick, update, find } from 'better-sqlite3-proxy'
+import {
+  resetSchedule,
+  checkSchedule,
+  getLastWatchLog,
+  getSchedule,
+} from '../api/schedule.js'
+import DateTimeText from '../components/datetime.js'
 
 let pageTitle = <Locale en="Endpoints" zh_hk="Endpoints" zh_cn="Endpoints" />
 let addPageTitle = (
@@ -360,6 +366,39 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
     error = String(e)
   }
 
+  let { schedule, time_to_wait } = getSchedule(item)
+  let last_log = getLastWatchLog(item)
+  let last_poll_time = last_log?.poll_time
+
+  let last_log_info = []
+  if (last_log?.version) {
+    last_log_info.push(
+      <>
+        <Locale en="Version:" zh_hk="版本：" zh_cn="版本：" />{' '}
+        <span>{last_log.version ?? '-'}</span>
+      </>,
+    )
+  }
+  if (last_log?.status_code) {
+    last_log_info.push(
+      <>
+        <Locale en="Status:" zh_hk="狀態：" zh_cn="状态：" />{' '}
+        <span>{last_log.status_code ?? '-'}</span>
+      </>,
+    )
+  }
+  if (last_log?.error) {
+    last_log_info.push(
+      <>
+        <Locale en="Error:" zh_hk="錯誤：" zh_cn="错误：" />{' '}
+        <span>{last_log.error ?? '-'}</span>
+      </>,
+    )
+  }
+  if (last_log_info.length === 0) {
+    last_log_info.push(<span>-</span>)
+  }
+
   let editButton = (
     <button
       type="button"
@@ -554,6 +593,29 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
               </dd>
             </dl>
           </div>
+          <dt>
+            <Locale en="Poll Schedule" zh_hk="輪詢排程" zh_cn="轮询排程" />
+          </dt>
+          <dd>
+            <Locale en="Next poll:" zh_hk="下次輪詢：" zh_cn="下次轮询：" />{' '}
+            <span>
+              <DateTimeText time={schedule.poll_time} /> (in{' '}
+              {formatInterval(time_to_wait)})
+            </span>
+            <br />
+            <Locale
+              en="Last poll:"
+              zh_hk="上次輪詢："
+              zh_cn="上次轮询："
+            />{' '}
+            <span>
+              {last_poll_time ? <DateTimeText time={last_poll_time} /> : '-'}
+            </span>
+          </dd>
+          <dt>
+            <Locale en="Latest Response" zh_hk="最新回應" zh_cn="最新回应" />
+          </dt>
+          <dd>{mapArray(last_log_info, info => info, <br />)}</dd>
         </dl>
         <BackToLink href="/endpoints" title={pageTitle} />
       </div>
@@ -615,7 +677,7 @@ function UpdateField(attrs: {}, context: WsContext) {
         update(proxy.endpoint, { id }, { desc: value })
         commitField()
         throw EarlyTerminate
-      case 'code':
+      case 'code': {
         update(proxy.endpoint, { id }, { code: value })
         try {
           let result = parseCode(value)
@@ -640,7 +702,10 @@ function UpdateField(attrs: {}, context: WsContext) {
             ['update-text', '#error-preview', String(error)],
           ])
         }
+        let endpoint = proxy.endpoint[id]
+        resetSchedule(endpoint)
         throw EarlyTerminate
+      }
       case 'min_interval': {
         let interval = parseInterval(value)
         update(proxy.endpoint, { id }, { min_interval: interval })
