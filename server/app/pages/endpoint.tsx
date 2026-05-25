@@ -23,6 +23,7 @@ import { BackToLink } from '../components/back-to-link.js'
 import { sweetAlertPlugin } from '../../client-plugins.js'
 import { getAuthUser } from '../auth/user.js'
 import { emptyObject, parseCode } from '../api/parse.js'
+import { formatInterval, parseInterval } from '../format/interval.js'
 import { pick, update } from 'better-sqlite3-proxy'
 import { Node } from '../jsx/types.js'
 
@@ -160,21 +161,13 @@ let addPage = (
               zh_hk="最小輪詢間隔"
               zh_cn="最小轮询间隔"
             />
-            :
+            *:
             <input
               name="min_interval"
-              type="number"
-              min="1000"
-              max="86400000"
-              value="60000"
+              type="text"
+              required
+              placeholder="e.g. 30m"
             />
-            <p class="hint">
-              <Locale
-                en="(in ms, default 60000, range 1s-1d)"
-                zh_hk="(毫秒，默認 60000，範圍 1秒-1天)"
-                zh_cn="(毫秒，默认 60000，范围 1秒-1天)"
-              />
-            </p>
           </label>
         </div>
         <div class="field">
@@ -184,37 +177,55 @@ let addPage = (
               zh_hk="最大輪詢間隔"
               zh_cn="最大轮询间隔"
             />
-            :
+            *:
             <input
               name="max_interval"
-              type="number"
-              min="1000"
-              max="86400000"
-              value="86400000"
+              type="text"
+              required
+              placeholder="e.g. 24h"
             />
-            <p class="hint">
-              <Locale
-                en="(in ms, default 86400000, range 1s-1d)"
-                zh_hk="(毫秒，默認 86400000，範圍 1秒-1天)"
-                zh_cn="(毫秒，默认 86400000，范围 1秒-1天)"
-              />
-            </p>
           </label>
         </div>
-        <input
-          type="submit"
-          value={<Locale en="Submit" zh_hk="提交" zh_cn="提交" />}
-        />
-        <p>
-          <Locale en="Remark:" zh_hk="備註：" zh_cn="备注：" />
-          <br />
+        <div class="hint-block">
+          <Locale en="Interval format:" zh_hk="間隔格式：" zh_cn="間隔格式：" />
+          <dl style="display: grid; grid-template-columns: auto auto; gap: 0 0.5rem; margin-block-start: 0">
+            <dt>s</dt>
+            <dd>
+              <Locale en="second" zh_hk="秒" zh_cn="秒" />
+            </dd>
+            <dt>m</dt>
+            <dd>
+              <Locale en="minute" zh_hk="分鐘" zh_cn="分鐘" />
+            </dd>
+            <dt>h</dt>
+            <dd>
+              <Locale en="hour" zh_hk="小時" zh_cn="小時" />
+            </dd>
+            <dt>d</dt>
+            <dd>
+              <Locale en="day" zh_hk="天" zh_cn="天" />
+            </dd>
+            <dt>w</dt>
+            <dd>
+              <Locale en="week" zh_hk="週" zh_cn="週" />
+            </dd>
+            <dt>mo</dt>
+            <dd>
+              <Locale en="month" zh_hk="月" zh_cn="月" />
+            </dd>
+          </dl>
+        </div>
+        <p class="remark">
           <Locale
             en="* mandatory fields"
             zh_hk="* 必填欄位"
             zh_cn="* 必填字段"
           />
         </p>
-        <p id="add-message"></p>
+        <input
+          type="submit"
+          value={<Locale en="Submit" zh_hk="提交" zh_cn="提交" />}
+        />
       </form>
     </div>
     {addPageScript}
@@ -231,8 +242,8 @@ let submitParser = object({
   title: string({ minLength: 3, maxLength: 50 }),
   desc: string({ maxLength: 200 }),
   code: string({ minLength: 1 }),
-  min_interval: string({ match: /^\d+$/ }),
-  max_interval: string({ match: /^\d+$/ }),
+  min_interval: string(),
+  max_interval: string(),
 })
 
 function Submit(attrs: {}, context: DynamicContext) {
@@ -253,8 +264,8 @@ function Submit(attrs: {}, context: DynamicContext) {
       desc: input.desc ?? '',
       code: input.code,
       user_id,
-      min_interval: input.min_interval ? Number(input.min_interval) : 60000,
-      max_interval: input.max_interval ? Number(input.max_interval) : 86400000,
+      min_interval: parseInterval(input.min_interval),
+      max_interval: parseInterval(input.max_interval),
     })
     return <Redirect href={`/endpoints/result?id=${id}`} />
   } catch (error) {
@@ -399,10 +410,14 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
               />
             </span>
             {editButton}
-            {EditControls({ field: 'title' })}
+            {EditControls({ field: 'code' })}
           </dd>
           <dt>
-            <Locale en="Description" zh_hk="描述" zh_cn="描述" />
+            <Locale
+              en="Min Poll Interval"
+              zh_hk="最小輪詢間隔"
+              zh_cn="最小轮询间隔"
+            />
           </dt>
           <dd
             class="field inline-edit-field"
@@ -462,6 +477,87 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
           <dd id="error-preview-container" hidden={!error}>
             <code id="error-preview">{error}</code>
           </dd>
+          <dt>
+            <Locale
+              en="Min Poll Interval"
+              zh_hk="最小輪詢間隔"
+              zh_cn="最小轮询间隔"
+            />
+          </dt>
+          <dd
+            class="field inline-edit-field"
+            data-field="min_interval"
+            data-mode="view"
+          >
+            <span class="view-mode">{formatInterval(item.min_interval)}</span>
+            <span class="edit-mode">
+              <input
+                name="min_interval"
+                type="text"
+                placeholder="e.g. 30m"
+                onkeydown="handleFieldKeydown(event)"
+              />
+            </span>
+            {editButton}
+            {EditControls({ field: 'min_interval' })}
+          </dd>
+          <dt>
+            <Locale
+              en="Max Poll Interval"
+              zh_hk="最大輪詢間隔"
+              zh_cn="最大轮询间隔"
+            />
+          </dt>
+          <dd
+            class="field inline-edit-field"
+            data-field="max_interval"
+            data-mode="view"
+          >
+            <span class="view-mode">{formatInterval(item.max_interval)}</span>
+            <span class="edit-mode">
+              <input
+                name="max_interval"
+                type="text"
+                placeholder="e.g. 24h"
+                onkeydown="handleFieldKeydown(event)"
+              />
+            </span>
+            {editButton}
+            {EditControls({ field: 'max_interval' })}
+          </dd>
+          <div class="hint-block">
+            <Locale
+              en="Interval format:"
+              zh_hk="間隔格式："
+              zh_cn="間隔格式："
+            />
+            <dl style="display: grid; grid-template-columns: auto auto; gap: 0 0.5rem; margin-block-start: 0">
+              <dt>s</dt>
+              <dd>
+                <Locale en="second" zh_hk="秒" zh_cn="秒" />
+              </dd>
+              <dt>m</dt>
+              <dd>
+                <Locale en="minute" zh_hk="分鐘" zh_cn="分鐘" />
+              </dd>
+              <dt>h</dt>
+              <dd>
+                <Locale en="hour" zh_hk="小時" zh_cn="小時" />
+              </dd>
+              <dt>d</dt>
+              <dd>
+                <Locale en="day" zh_hk="天" zh_cn="天" />
+              </dd>
+              <dt>w</dt>
+              <dd>
+                <Locale en="week" zh_hk="週" zh_cn="週" />
+              </dd>
+              <dt>mo</dt>
+              <dd>
+                <Locale en="month" zh_hk="月" zh_cn="月" />
+              </dd>
+            </dl>
+          </div>
         </dl>
         <BackToLink href="/endpoints" title={pageTitle} />
       </div>
@@ -548,6 +644,28 @@ function UpdateField(attrs: {}, context: WsContext) {
             ['update-text', '#error-preview', String(error)],
           ])
         }
+        throw EarlyTerminate
+      case 'min_interval':
+        value = String(parseInterval(value))
+        update(proxy.endpoint, { id }, { min_interval: Number(value) })
+        commitField([
+          [
+            'update-text',
+            `${container} .field[data-field="min_interval"] .view-mode`,
+            formatInterval(Number(value)),
+          ],
+        ])
+        throw EarlyTerminate
+      case 'max_interval':
+        value = String(parseInterval(value))
+        update(proxy.endpoint, { id }, { max_interval: Number(value) })
+        commitField([
+          [
+            'update-text',
+            `${container} .field[data-field="max_interval"] .view-mode`,
+            formatInterval(Number(value)),
+          ],
+        ])
         throw EarlyTerminate
       default:
         throw `Unknown field: ${field}`
