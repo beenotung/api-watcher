@@ -1,3 +1,5 @@
+import { parse } from 'best-effort-json-parser'
+
 export const emptyObject = {}
 
 export function parseCode(code: string): { url: string; init: RequestInit } {
@@ -36,7 +38,7 @@ export function parseCode(code: string): { url: string; init: RequestInit } {
   if (code.startsWith(',')) {
     code = code.slice(1).trim()
     if (code !== '{}' && code !== '') {
-      init = JSON.parse(code)
+      init = parse(code)
     }
     code = ''
   }
