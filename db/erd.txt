@@ -108,9 +108,9 @@ id integer PK
 timestamp integer
 title text
 error text
-request_log_id integer FK >0- request_log.id
 client_url_id integer FK >- url.id
 api_url_id integer FK >- url.id
+request_log_id integer FK >0- request_log.id
 
 
 verification_code
@@ -155,18 +155,18 @@ reject_time integer NULL
 # diagram-text: #000000
 # table-bg: #ffffff
 # table-text: #000000
-# request_log (39, 62)
+# request_log (47, 58)
 # method (450, 15)
 # url (450, 130)
-# geo_ip_parts (-332, -6)
-# geo_ip (-267, 187)
+# geo_ip_parts (46, 530)
+# geo_ip (45, 386)
 # user_agent (450, 245)
-# ua_type (1036, 178)
-# ua_bot (1037, 323)
-# ua_stat (1035, 68)
+# ua_type (845, 250)
+# ua_bot (845, 410)
+# ua_stat (1013, 69)
 # request_session (450, 445)
 # user (450, 680)
-# error_log (725, -36)
-# verification_code (50, 550)
-# verification_attempt (50, 372)
+# error_log (722, 7)
+# verification_code (46, 673)
+# verification_attempt (45, 973)
 # content_report (844, 573)
