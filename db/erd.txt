@@ -177,7 +177,8 @@ error text NULL
 status_code integer NULL
 content_type text NULL
 body text NULL
-version integer
+version integer NULL
+is_new_version boolean
 
 
 # zoom: 1.000

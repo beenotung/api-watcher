@@ -26,6 +26,7 @@ import { emptyObject, parseCode } from '../api/parse.js'
 import { formatInterval, parseInterval } from '../format/interval.js'
 import { pick, update } from 'better-sqlite3-proxy'
 import { Node } from '../jsx/types.js'
+import { checkSchedule } from '../api/schedule.js'
 
 let pageTitle = <Locale en="Endpoints" zh_hk="Endpoints" zh_cn="Endpoints" />
 let addPageTitle = (
@@ -267,6 +268,7 @@ function Submit(attrs: {}, context: DynamicContext) {
       min_interval: parseInterval(input.min_interval),
       max_interval: parseInterval(input.max_interval),
     })
+    checkSchedule(proxy.endpoint[id])
     return <Redirect href={`/endpoints/result?id=${id}`} />
   } catch (error) {
     throwIfInAPI(error, '#add-message', context)
@@ -651,6 +653,7 @@ function UpdateField(attrs: {}, context: WsContext) {
             formatInterval(Number(value)),
           ],
         ])
+        checkSchedule(proxy.endpoint[id])
         throw EarlyTerminate
       }
       case 'max_interval': {
@@ -663,6 +666,7 @@ function UpdateField(attrs: {}, context: WsContext) {
             formatInterval(Number(value)),
           ],
         ])
+        checkSchedule(proxy.endpoint[id])
         throw EarlyTerminate
       }
       default:

@@ -169,7 +169,8 @@ export type WatchLog = {
   status_code: null | number
   content_type: null | string
   body: null | string
-  version: number
+  version: null | number
+  is_new_version: boolean
 }
 
 export type DBProxy = {
