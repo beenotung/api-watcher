@@ -29,8 +29,8 @@ import {
   checkSchedule,
   getLastWatchLog,
   getSchedule,
-  getVersionHistory,
 } from '../api/schedule.js'
+import { getVersionHistory } from '../api/extract.js'
 import DateTimeText, {
   formatDateTimeText,
   toLocaleDateTimeString,
