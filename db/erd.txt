@@ -206,5 +206,5 @@ is_new_version boolean
 # verification_attempt (45, 973)
 # content_report (844, 573)
 # endpoint (450, 980)
-# watch_schedule (750, 980)
-# watch_log (1090, 980)
+# watch_schedule (800, 980)
+# watch_log (1140, 980)
