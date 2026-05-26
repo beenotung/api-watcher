@@ -72,6 +72,7 @@ function scan() {
   scanDir('db')
   scanDir('client')
   scanDir('template')
+  scanDir('res')
 
   return files
 }

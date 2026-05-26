@@ -2,6 +2,7 @@ import { db } from '../../../db/db.js'
 import { Endpoint, proxy, WatchLog, WatchSchedule } from '../../../db/proxy.js'
 import { update } from 'better-sqlite3-proxy'
 import { parseCode } from './parse.js'
+import { existsSync } from 'fs'
 
 let select_next_schedule = db
   .prepare<{ endpoint_id: number }, number>(
@@ -174,6 +175,25 @@ export function getLastWatchLog(endpoint: Endpoint): WatchLog | null {
   return proxy.watch_log[last_log_id]
 }
 
-for (let endpoint of proxy.endpoint) {
-  checkSchedule(endpoint)
+async function init() {
+  if (existsSync('dist/res/wrapper.js')) {
+    let { serverP } = await import('../../../res/wrapper.js')
+    let server = await serverP
+    let stopped = false
+    function stop() {
+      if (stopped) return
+      stopped = true
+      console.log('stopping wrapper server...')
+      server.close()
+      process.exit(0)
+    }
+    process.once('SIGINT', stop)
+    process.once('SIGTERM', stop)
+    process.once('exit', stop)
+  }
+  console.log('init schedule of', proxy.endpoint.length, 'endpoints')
+  for (let endpoint of proxy.endpoint) {
+    checkSchedule(endpoint)
+  }
 }
+init()

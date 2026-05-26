@@ -1,3 +1,7 @@
+// Copy this file to wrapper.ts and customize for your project
+// wrapper.ts is gitignored
+
+import type { Server } from 'http'
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import express from 'express'
@@ -86,7 +90,15 @@ wrap_api('/sms-credit/company-b', async () => {
 })
 
 let port = 8282
-app.listen(port, () => {
-  console.log('wrapper server for api endpoints')
-  print(port)
+export let serverP = new Promise<Server>((resolve, reject) => {
+  let server = app
+    .listen(port, () => {
+      console.log('wrapper server for api endpoints')
+      print(port)
+      resolve(server)
+    })
+    .on('error', error => {
+      console.error('wrapper server error:', error)
+      reject(error)
+    })
 })
