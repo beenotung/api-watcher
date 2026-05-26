@@ -196,6 +196,21 @@ let addPage = (
             />
           </label>
         </div>
+        <div class="field">
+          <label>
+            <Locale
+              en="JSON Extract Path"
+              zh_hk="JSON 提取路徑"
+              zh_cn="JSON 提取路径"
+            />
+            :
+            <input
+              name="extract_field"
+              type="text"
+              placeholder="e.g. $.data.usage"
+            />
+          </label>
+        </div>
         <div class="hint-block">
           <Locale en="Interval format:" zh_hk="間隔格式：" zh_cn="間隔格式：" />
           <dl style="display: grid; grid-template-columns: auto auto; gap: 0 0.5rem; margin-block-start: 0">
@@ -254,6 +269,7 @@ let submitParser = object({
   code: string({ minLength: 1 }),
   min_interval: string(),
   max_interval: string(),
+  extract_field: string(),
 })
 
 function Submit(attrs: {}, context: DynamicContext) {
@@ -276,6 +292,7 @@ function Submit(attrs: {}, context: DynamicContext) {
       user_id,
       min_interval: parseInterval(input.min_interval),
       max_interval: parseInterval(input.max_interval),
+      extract_field: input.extract_field || '$',
     })
     checkSchedule(proxy.endpoint[id])
     return <Redirect href={`/endpoints/result?id=${id}`} />
@@ -608,6 +625,30 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
             </dl>
           </div>
           <dt>
+            <Locale
+              en="JSON Extract Path"
+              zh_hk="JSON 提取路徑"
+              zh_cn="JSON 提取路径"
+            />
+          </dt>
+          <dd
+            class="field inline-edit-field"
+            data-field="extract_field"
+            data-mode="view"
+          >
+            <span class="view-mode">{item.extract_field || '$'}</span>
+            <span class="edit-mode">
+              <input
+                name="extract_field"
+                type="text"
+                placeholder="e.g. $.data.usage"
+                onkeydown="handleFieldKeydown(event)"
+              />
+            </span>
+            {editButton}
+            {EditControls({ field: 'extract_field' })}
+          </dd>
+          <dt>
             <Locale en="Poll Schedule" zh_hk="輪詢排程" zh_cn="轮询排程" />
           </dt>
           <dd>
@@ -639,6 +680,9 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
                     <Locale en="Version" zh_hk="版本" zh_cn="版本" />
                   </th>
                   <th>
+                    <Locale en="Payload" zh_hk="有效載荷" zh_cn="有效载荷" />
+                  </th>
+                  <th>
                     <Locale en="Duration" zh_hk="時長" zh_cn="时长" />
                   </th>
                   <th>
@@ -647,9 +691,6 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
                   <th>
                     <Locale en="Last" zh_hk="末次" zh_cn="末次" />
                   </th>
-                  <th>
-                    <Locale en="Body" zh_hk="主體" zh_cn="主体" />
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -657,15 +698,15 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
                   <tr>
                     <td>{row.version}</td>
                     <td>
-                      {formatInterval(row.last_poll_time - row.first_poll_time)}
-                    </td>
-                    <td>{formatDateTime(row.first_poll_time)}</td>
-                    <td>{formatDateTime(row.last_poll_time)}</td>
-                    <td>
                       <pre style="max-width: 400px; overflow: auto;">
                         {row.body ?? '-'}
                       </pre>
                     </td>
+                    <td>
+                      {formatInterval(row.last_poll_time - row.first_poll_time)}
+                    </td>
+                    <td>{formatDateTime(row.first_poll_time)}</td>
+                    <td>{formatDateTime(row.last_poll_time)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -785,6 +826,12 @@ function UpdateField(attrs: {}, context: WsContext) {
           ],
         ])
         checkSchedule(proxy.endpoint[id])
+        throw EarlyTerminate
+      }
+      case 'extract_field': {
+        let field = value || '$'
+        update(proxy.endpoint, { id }, { extract_field: field })
+        commitField()
         throw EarlyTerminate
       }
       default:

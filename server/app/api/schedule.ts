@@ -182,14 +182,14 @@ export type VersionHistory = {
 }
 
 let select_version_history = db.prepare<
-  { endpoint_id: number },
+  { endpoint_id: number; path: string },
   VersionHistory
 >(/* sql */ `
 select
   min(watch_log.poll_time) first_poll_time
 , max(watch_log.poll_time) last_poll_time
 , watch_log.version
-, watch_log.body
+, json_extract(watch_log.body, :path) body
 from watch_log
 inner join watch_schedule on watch_schedule.id = watch_log.watch_schedule_id
 where watch_schedule.endpoint_id = :endpoint_id
@@ -198,7 +198,11 @@ group by watch_log.version
 `)
 
 export function getVersionHistory(endpoint: Endpoint): VersionHistory[] {
-  return select_version_history.all({ endpoint_id: endpoint.id! })
+  let path = endpoint.extract_field || '$'
+  return select_version_history.all({
+    endpoint_id: endpoint.id!,
+    path,
+  })
 }
 
 for (let endpoint of proxy.endpoint) {

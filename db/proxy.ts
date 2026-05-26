@@ -148,6 +148,7 @@ export type Endpoint = {
   user?: User
   min_interval: number
   max_interval: number
+  extract_field: null | string
 }
 
 export type WatchSchedule = {
