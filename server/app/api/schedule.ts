@@ -174,6 +174,33 @@ export function getLastWatchLog(endpoint: Endpoint): WatchLog | null {
   return proxy.watch_log[last_log_id]
 }
 
+export type VersionHistory = {
+  first_poll_time: number
+  last_poll_time: number
+  version: number
+  body: string | null
+}
+
+let select_version_history = db.prepare<
+  { endpoint_id: number },
+  VersionHistory
+>(/* sql */ `
+select
+  min(watch_log.poll_time) first_poll_time
+, max(watch_log.poll_time) last_poll_time
+, watch_log.version
+, watch_log.body
+from watch_log
+inner join watch_schedule on watch_schedule.id = watch_log.watch_schedule_id
+where watch_schedule.endpoint_id = :endpoint_id
+  and watch_log.version is not null
+group by watch_log.version
+`)
+
+export function getVersionHistory(endpoint: Endpoint): VersionHistory[] {
+  return select_version_history.all({ endpoint_id: endpoint.id! })
+}
+
 for (let endpoint of proxy.endpoint) {
   checkSchedule(endpoint)
 }

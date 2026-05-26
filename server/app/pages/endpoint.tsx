@@ -29,8 +29,13 @@ import {
   checkSchedule,
   getLastWatchLog,
   getSchedule,
+  getVersionHistory,
 } from '../api/schedule.js'
-import DateTimeText from '../components/datetime.js'
+import DateTimeText, {
+  formatDateTimeText,
+  toLocaleDateTimeString,
+} from '../components/datetime.js'
+import { format_time_code } from '@beenotung/tslib/format.js'
 
 let pageTitle = <Locale en="Endpoints" zh_hk="Endpoints" zh_cn="Endpoints" />
 let addPageTitle = (
@@ -369,6 +374,7 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
   let { schedule, time_to_wait } = getSchedule(item)
   let last_log = getLastWatchLog(item)
   let last_poll_time = last_log?.poll_time
+  let version_history = getVersionHistory(item)
 
   let last_log_info = []
   if (last_log?.version) {
@@ -397,6 +403,14 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
   }
   if (last_log_info.length === 0) {
     last_log_info.push(<span>-</span>)
+  }
+
+  function formatDateTime(time: number) {
+    return toLocaleDateTimeString(time, context, {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      hour12: false,
+    })
   }
 
   let editButton = (
@@ -599,7 +613,7 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
           <dd>
             <Locale en="Next poll:" zh_hk="下次輪詢：" zh_cn="下次轮询：" />{' '}
             <span>
-              <DateTimeText time={schedule.poll_time} /> (in{' '}
+              {formatDateTime(schedule.poll_time)} (in{' '}
               {formatInterval(time_to_wait)})
             </span>
             <br />
@@ -608,14 +622,55 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
               zh_hk="上次輪詢："
               zh_cn="上次轮询："
             />{' '}
-            <span>
-              {last_poll_time ? <DateTimeText time={last_poll_time} /> : '-'}
-            </span>
+            <span>{last_poll_time ? formatDateTime(last_poll_time) : '-'}</span>
           </dd>
           <dt>
             <Locale en="Latest Response" zh_hk="最新回應" zh_cn="最新回应" />
           </dt>
           <dd>{mapArray(last_log_info, info => info, <br />)}</dd>
+          <dt>
+            <Locale en="Version History" zh_hk="版本歷史" zh_cn="版本历史" />
+          </dt>
+          <dd>
+            <table>
+              <thead>
+                <tr>
+                  <th>
+                    <Locale en="Version" zh_hk="版本" zh_cn="版本" />
+                  </th>
+                  <th>
+                    <Locale en="Duration" zh_hk="時長" zh_cn="时长" />
+                  </th>
+                  <th>
+                    <Locale en="First" zh_hk="首次" zh_cn="首次" />
+                  </th>
+                  <th>
+                    <Locale en="Last" zh_hk="末次" zh_cn="末次" />
+                  </th>
+                  <th>
+                    <Locale en="Body" zh_hk="主體" zh_cn="主体" />
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {mapArray(version_history, row => (
+                  <tr>
+                    <td>{row.version}</td>
+                    <td>
+                      {formatInterval(row.last_poll_time - row.first_poll_time)}
+                    </td>
+                    <td>{formatDateTime(row.first_poll_time)}</td>
+                    <td>{formatDateTime(row.last_poll_time)}</td>
+                    <td>
+                      <pre style="max-width: 400px; overflow: auto;">
+                        {row.body ?? '-'}
+                      </pre>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </dd>
         </dl>
         <BackToLink href="/endpoints" title={pageTitle} />
       </div>
