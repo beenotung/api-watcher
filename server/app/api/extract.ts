@@ -96,6 +96,7 @@ inner join watch_schedule on watch_schedule.id = watch_log.watch_schedule_id
 where watch_schedule.endpoint_id = :endpoint_id
   and watch_log.version is not null
 order by watch_log.version desc
+       , watch_log.id desc
 limit 1
 `)
 
