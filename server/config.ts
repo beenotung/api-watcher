@@ -22,9 +22,9 @@ export enum LayoutType {
 export let config = {
   production,
   development,
-  site_name: 'Api Watcher',
+  site_name: 'API Watcher',
   short_site_name: 'AW',
-  site_description: 'Demo website of ts-liveview',
+  site_description: 'Track API responses and changes over time.',
   setup_robots_txt: false,
   epoch,
   auto_open: !production && development && epoch === 1,
