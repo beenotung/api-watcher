@@ -36,3 +36,7 @@ uploads/
 data/*.tmp.*
 data/*.sql
 data/*.zst
+
+# custom API wrapper handling auth and dom query selector
+res/*
+!res/wrapper-example.ts
