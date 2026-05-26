@@ -28,6 +28,9 @@ db.function(
 
 // support nested fields
 function json_extract(body: string, extract_field: string): string | null {
+  if (extract_field === '$' || extract_field === '$.') {
+    return body
+  }
   let json = JSON.parse(body)
   let fields = extract_field.replace('$.', '').split('.')
   let value = json
