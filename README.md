@@ -1,6 +1,6 @@
 # api-watcher
 
-Track API usage patterns and changes over time.
+Track API responses and changes over time.
 
 Use cases:
 
