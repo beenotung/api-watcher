@@ -75,3 +75,36 @@ export function getVersionHistory(endpoint: Endpoint): VersionHistory[] {
     path,
   })
 }
+
+let select_last_payload = db.prepare<
+  {
+    endpoint_id: number
+    path: string
+  },
+  {
+    body: string | null
+    poll_time: number
+    id: number
+  }
+>(/* sql */ `
+select
+  extract_field(watch_log.content_type, watch_log.body, :path) body
+, watch_log.poll_time
+, watch_log.id
+from watch_log
+inner join watch_schedule on watch_schedule.id = watch_log.watch_schedule_id
+where watch_schedule.endpoint_id = :endpoint_id
+  and watch_log.version is not null
+order by watch_log.version desc
+limit 1
+`)
+
+export function getLastPayload(
+  endpoint: Endpoint | { id?: number | null; extract_field: string | null },
+) {
+  let path = endpoint.extract_field || '$'
+  return select_last_payload.get({
+    endpoint_id: endpoint.id!,
+    path,
+  })
+}

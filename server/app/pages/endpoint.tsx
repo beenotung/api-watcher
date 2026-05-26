@@ -30,12 +30,13 @@ import {
   getLastWatchLog,
   getSchedule,
 } from '../api/schedule.js'
-import { getVersionHistory } from '../api/extract.js'
+import { getLastPayload, getVersionHistory } from '../api/extract.js'
 import DateTimeText, {
   formatDateTimeText,
   toLocaleDateTimeString,
 } from '../components/datetime.js'
 import { format_time_code } from '@beenotung/tslib/format.js'
+import { db } from '../../../db/db.js'
 
 let pageTitle = <Locale en="Endpoints" zh_hk="Endpoints" zh_cn="Endpoints" />
 let addPageTitle = (
@@ -49,6 +50,13 @@ let style = Style(/* css */ `
   font-weight: bold;
 }
 .api--desc {
+  font-style: italic;
+}
+.payload-body {
+  font-weight: bold;
+}
+.poll-time {
+  color: #666;
 }
 `)
 
@@ -57,21 +65,43 @@ let script = Script(/* js */ `
 
 function ListPage(attrs: {}, context: Context) {
   let user = getAuthUser(context)
-  let items = pick(proxy.endpoint, ['id', 'title', 'desc', 'code'])
+  let items = pick(proxy.endpoint, [
+    'id',
+    'title',
+    'desc',
+    'code',
+    'extract_field',
+  ])
   return (
     <>
       {style}
       <div id="Endpoint">
         <h1>{pageTitle}</h1>
         <ul>
-          {mapArray(items, item => (
-            <li>
-              <Link href={`/endpoints/${item.id}`} class="api--title">
-                {item.title}
-              </Link>{' '}
-              - <span class="api--desc">{item.desc}</span>
-            </li>
-          ))}
+          {mapArray(items, item => {
+            let last_payload = getLastPayload(item)
+            return (
+              <li>
+                <Link href={`/endpoints/${item.id}`} class="api--title">
+                  {item.title}
+                </Link>{' '}
+                - <span class="api--desc">{item.desc}</span>
+                {last_payload ? (
+                  <div class="last-payload">
+                    <span class="payload-body">{last_payload.body}</span>
+                    <span class="poll-time">
+                      {' '}
+                      |
+                      {formatDateTimeText(
+                        { time: last_payload.poll_time },
+                        context,
+                      )}
+                    </span>
+                  </div>
+                ) : null}
+              </li>
+            )
+          })}
         </ul>
         {user ? (
           <Link href="/endpoints/add">
