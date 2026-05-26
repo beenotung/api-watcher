@@ -23,7 +23,7 @@ import { sweetAlertPlugin } from '../../client-plugins.js'
 import { getAuthUser } from '../auth/user.js'
 import { emptyObject, parseCode } from '../api/parse.js'
 import { formatInterval, parseInterval } from '../format/interval.js'
-import { pick, update, find } from 'better-sqlite3-proxy'
+import { pick, update } from 'better-sqlite3-proxy'
 import {
   resetSchedule,
   checkSchedule,
@@ -31,12 +31,10 @@ import {
   getSchedule,
 } from '../api/schedule.js'
 import { getLastPayload, getVersionHistory } from '../api/extract.js'
-import DateTimeText, {
+import {
   formatDateTimeText,
   toLocaleDateTimeString,
 } from '../components/datetime.js'
-import { format_time_code } from '@beenotung/tslib/format.js'
-import { db } from '../../../db/db.js'
 
 let pageTitle = <Locale en="Endpoints" zh_hk="Endpoints" zh_cn="Endpoints" />
 let addPageTitle = (
