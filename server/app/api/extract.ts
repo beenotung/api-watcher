@@ -66,6 +66,7 @@ inner join watch_schedule on watch_schedule.id = watch_log.watch_schedule_id
 where watch_schedule.endpoint_id = :endpoint_id
   and watch_log.version is not null
 group by watch_log.version
+order by version desc
 `)
 
 export function getVersionHistory(endpoint: Endpoint): VersionHistory[] {
