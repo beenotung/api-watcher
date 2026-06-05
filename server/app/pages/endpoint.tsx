@@ -508,7 +508,7 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
               />
             </span>
             {editButton}
-            {EditControls({ field: 'code' })}
+            {EditControls({ field: 'title' })}
           </dd>
           <dt>
             <Locale en="Description" zh_hk="描述" zh_cn="描述" />
