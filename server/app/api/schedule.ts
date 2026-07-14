@@ -189,7 +189,6 @@ async function init() {
     }
     process.once('SIGINT', stop)
     process.once('SIGTERM', stop)
-    process.once('exit', stop)
   }
   console.log('init schedule of', proxy.endpoint.length, 'endpoints')
   for (let endpoint of proxy.endpoint) {
