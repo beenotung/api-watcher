@@ -110,3 +110,37 @@ export function getLastPayload(
     path,
   })
 }
+
+let select_numeric_history = db.prepare<
+  { endpoint_id: number; path: string },
+  { poll_time: number; body: string | null }
+>(/* sql */ `
+select
+  watch_log.poll_time
+, extract_field(watch_log.content_type, watch_log.body, :path) body
+from watch_log
+inner join watch_schedule on watch_schedule.id = watch_log.watch_schedule_id
+where watch_schedule.endpoint_id = :endpoint_id
+  and watch_log.version is not null
+order by watch_log.poll_time asc
+`)
+
+export type NumericPoint = {
+  poll_time: number
+  value: number
+}
+
+export function getNumericHistory(endpoint: Endpoint): NumericPoint[] {
+  let path = endpoint.extract_field || '$'
+  let rows = select_numeric_history.all({
+    endpoint_id: endpoint.id!,
+    path,
+  })
+  let points: NumericPoint[] = []
+  for (let row of rows) {
+    let value = Number(row.body)
+    if (row.body == null || row.body === '' || !isFinite(value)) continue
+    points.push({ poll_time: row.poll_time, value })
+  }
+  return points
+}

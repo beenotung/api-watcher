@@ -149,6 +149,7 @@ export type Endpoint = {
   min_interval: number
   max_interval: number
   extract_field: null | string
+  forecast_samples: null | number
 }
 
 export type WatchSchedule = {

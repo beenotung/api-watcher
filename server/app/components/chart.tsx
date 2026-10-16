@@ -10,10 +10,12 @@ export function Chart(attrs: {
   skip_canvas?: boolean
   datasets: {
     label: string
-    data: number[]
+    data: (number | null)[]
     hidden?: boolean
     borderColor?: string
     backgroundColor?: string
+    /** e.g. `[6, 6]` for a dashed line */
+    borderDash?: number[]
   }[]
   data_labels: string[]
   type?: 'line' | 'bar' | 'radar'
@@ -58,6 +60,8 @@ export function Chart(attrs: {
         hidden: dataset.hidden,
         borderColor: dataset.borderColor,
         backgroundColor: dataset.backgroundColor,
+        borderDash: dataset.borderDash,
+        spanGaps: true,
       })),
     },
     options: {

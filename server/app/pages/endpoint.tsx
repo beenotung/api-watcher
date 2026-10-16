@@ -30,7 +30,13 @@ import {
   getLastWatchLog,
   getSchedule,
 } from '../api/schedule.js'
-import { getLastPayload, getVersionHistory } from '../api/extract.js'
+import {
+  getLastPayload,
+  getNumericHistory,
+  getVersionHistory,
+} from '../api/extract.js'
+import { forecastToTarget, type Forecast } from '../api/forecast.js'
+import { Chart, ChartScript } from '../components/chart.js'
 import {
   formatDateTimeText,
   toLocaleDateTimeString,
@@ -40,6 +46,41 @@ let pageTitle = <Locale en="Endpoints" zh_hk="Endpoints" zh_cn="Endpoints" />
 let addPageTitle = (
   <Locale en="Add Endpoint" zh_hk="添加Endpoint" zh_cn="添加Endpoint" />
 )
+
+const DAY = 24 * 60 * 60 * 1000
+
+function addMonths(time: number, months: number): number {
+  let date = new Date(time)
+  date.setMonth(date.getMonth() + months)
+  return date.getTime()
+}
+
+let forecastHorizons = [
+  {
+    label: <Locale en="1 day" zh_hk="1 天" zh_cn="1 天" />,
+    add: (time: number) => time + DAY,
+  },
+  {
+    label: <Locale en="1 week" zh_hk="1 週" zh_cn="1 周" />,
+    add: (time: number) => time + 7 * DAY,
+  },
+  {
+    label: <Locale en="1 month" zh_hk="1 個月" zh_cn="1 个月" />,
+    add: (time: number) => addMonths(time, 1),
+  },
+  {
+    label: <Locale en="3 months" zh_hk="3 個月" zh_cn="3 个月" />,
+    add: (time: number) => addMonths(time, 3),
+  },
+  {
+    label: <Locale en="6 months" zh_hk="6 個月" zh_cn="6 个月" />,
+    add: (time: number) => addMonths(time, 6),
+  },
+  {
+    label: <Locale en="1 year" zh_hk="1 年" zh_cn="1 年" />,
+    add: (time: number) => addMonths(time, 12),
+  },
+]
 
 let style = Style(/* css */ `
 #Endpoint {
@@ -239,6 +280,30 @@ let addPage = (
             />
           </label>
         </div>
+        <div class="field">
+          <label>
+            <Locale
+              en="Forecast Samples"
+              zh_hk="預測樣本數"
+              zh_cn="预测样本数"
+            />
+            :
+            <input
+              name="forecast_samples"
+              type="number"
+              min="2"
+              step="1"
+              placeholder="default: 2"
+            />
+            <p class="hint">
+              <Locale
+                en="(number of latest samples used to estimate the rate)"
+                zh_hk="(用於估算速率的最新樣本數)"
+                zh_cn="(用于估算速率的最新样本数)"
+              />
+            </p>
+          </label>
+        </div>
         <div class="hint-block">
           <Locale en="Interval format:" zh_hk="間隔格式：" zh_cn="間隔格式：" />
           <dl style="display: grid; grid-template-columns: auto auto; gap: 0 0.5rem; margin-block-start: 0">
@@ -298,7 +363,13 @@ let submitParser = object({
   min_interval: string(),
   max_interval: string(),
   extract_field: string(),
+  forecast_samples: string(),
 })
+
+function parseForecastSamples(text: string): number | null {
+  let samples = Math.floor(Number(text))
+  return Number.isFinite(samples) && samples >= 2 ? samples : null
+}
 
 function Submit(attrs: {}, context: DynamicContext) {
   try {
@@ -321,6 +392,7 @@ function Submit(attrs: {}, context: DynamicContext) {
       min_interval: parseInterval(input.min_interval),
       max_interval: parseInterval(input.max_interval),
       extract_field: input.extract_field || '$',
+      forecast_samples: parseForecastSamples(input.forecast_samples),
     })
     checkSchedule(proxy.endpoint[id])
     return <Redirect href={`/endpoints/result?id=${id}`} />
@@ -348,6 +420,12 @@ let detailPageStyle = Style(/* css */ `
   display: inline-block;
   max-width: min(120ch, 90vw);
   overflow-wrap: break-word;
+}
+#value-history-chart {
+  max-width: 640px;
+}
+#DetailEndpoint .num {
+  text-align: right;
 }
 `)
 
@@ -403,6 +481,13 @@ function handleFieldKeydown(event) {
 }
 `)
 
+function buildForecastRows(forecast: Forecast) {
+  return forecastHorizons.map(horizon => {
+    let time = horizon.add(forecast.poll_time)
+    return { label: horizon.label, time, value: forecast.project(time) }
+  })
+}
+
 function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
   let { item } = attrs
   let url: string = ''
@@ -420,6 +505,13 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
   let last_log = getLastWatchLog(item)
   let last_poll_time = last_log?.poll_time
   let version_history = getVersionHistory(item)
+  let numeric_history = getNumericHistory(item)
+  let forecast = forecastToTarget(numeric_history, {
+    samples: item.forecast_samples ?? 2,
+    // project up to the next scheduled poll (clamp in case it is overdue)
+    next_time: Math.max(schedule.poll_time, Date.now()),
+  })
+  let forecast_rows = forecast ? buildForecastRows(forecast) : []
 
   let last_log_info = []
   if (last_log?.version) {
@@ -456,6 +548,63 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
       timeStyle: 'medium',
       hour12: false,
     })
+  }
+
+  // Build a time-proportional x-axis. Chart.js evenly spaces category labels,
+  // so we insert blank filler slots between readings to reflect the real time
+  // gaps. Labels include the year to avoid ambiguity.
+  let chart_labels: string[] = []
+  let chart_data: (number | null)[] = []
+  let forecast_data: (number | null)[] = []
+  if (numeric_history.length > 0) {
+    function formatChartTime(time: number) {
+      return toLocaleDateTimeString(time, context, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      })
+    }
+
+    let last_point = numeric_history[numeric_history.length - 1]
+    let next_time = forecast?.next_time
+    let span =
+      next_time != null
+        ? next_time - numeric_history[0].poll_time
+        : last_point.poll_time - numeric_history[0].poll_time
+    let max_slots = 48
+    let slot_duration = span > 0 ? span / max_slots : 0
+    function pushFiller(from: number, to: number) {
+      if (slot_duration <= 0) return
+      let slots = Math.round((to - from) / slot_duration) - 1
+      slots = Math.max(0, Math.min(slots, max_slots))
+      for (let i = 0; i < slots; i++) {
+        chart_labels.push('')
+        chart_data.push(null)
+        forecast_data.push(null)
+      }
+    }
+
+    for (let i = 0; i < numeric_history.length; i++) {
+      let point = numeric_history[i]
+      if (i > 0) {
+        pushFiller(numeric_history[i - 1].poll_time, point.poll_time)
+      }
+      chart_labels.push(formatChartTime(point.poll_time))
+      chart_data.push(point.value)
+      forecast_data.push(null)
+    }
+    if (next_time != null && forecast?.next_value != null) {
+      let last_reading_index = forecast_data.length - 1
+      pushFiller(last_point.poll_time, next_time)
+      chart_labels.push(formatChartTime(next_time))
+      chart_data.push(null)
+      // connect the forecast line to the last known reading
+      forecast_data[last_reading_index] = forecast.value
+      forecast_data.push(forecast.next_value)
+    }
   }
 
   let editButton = (
@@ -677,6 +826,39 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
             {EditControls({ field: 'extract_field' })}
           </dd>
           <dt>
+            <Locale
+              en="Forecast Samples"
+              zh_hk="預測樣本數"
+              zh_cn="预测样本数"
+            />
+          </dt>
+          <dd
+            class="field inline-edit-field"
+            data-field="forecast_samples"
+            data-mode="view"
+          >
+            <span class="view-mode">{item.forecast_samples ?? 2}</span>
+            <span class="edit-mode">
+              <input
+                name="forecast_samples"
+                type="number"
+                min="2"
+                step="1"
+                placeholder="default: 2"
+                onkeydown="handleFieldKeydown(event)"
+              />
+            </span>
+            {editButton}
+            {EditControls({ field: 'forecast_samples' })}
+            <p class="hint">
+              <Locale
+                en="(number of latest samples used to estimate the rate)"
+                zh_hk="(用於估算速率的最新樣本數)"
+                zh_cn="(用于估算速率的最新样本数)"
+              />
+            </p>
+          </dd>
+          <dt>
             <Locale en="Poll Schedule" zh_hk="輪詢排程" zh_cn="轮询排程" />
           </dt>
           <dd>
@@ -697,6 +879,118 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
             <Locale en="Latest Response" zh_hk="最新回應" zh_cn="最新回应" />
           </dt>
           <dd>{mapArray(last_log_info, info => info, <br />)}</dd>
+          {numeric_history.length > 0 ? (
+            <>
+              <dt>
+                <Locale en="Forecast" zh_hk="預測" zh_cn="预测" />
+              </dt>
+              <dd>
+                {forecast ? (
+                  <>
+                    <Locale en="Rate:" zh_hk="速率：" zh_cn="速率：" />{' '}
+                    {forecast.rate_per_day.toFixed(2)}/
+                    <Locale en="day" zh_hk="天" zh_cn="天" /> ·{' '}
+                    {forecast.sample_size}{' '}
+                    <Locale en="samples" zh_hk="個樣本" zh_cn="个样本" />
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>
+                            <Locale en="Horizon" zh_hk="時距" zh_cn="时距" />
+                          </th>
+                          <th class="num">
+                            <Locale
+                              en="Estimated Value"
+                              zh_hk="估算數值"
+                              zh_cn="估算数值"
+                            />
+                          </th>
+                          <th>
+                            <Locale
+                              en="Estimated Date"
+                              zh_hk="估算日期"
+                              zh_cn="估算日期"
+                            />
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mapArray(forecast_rows, row => (
+                          <tr>
+                            <td>{row.label}</td>
+                            <td class="num">
+                              <pre style="max-width: 400px; overflow: auto;">
+                                {row.value.toFixed(2)}
+                              </pre>
+                            </td>
+                            <td>{formatDateTime(row.time)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {forecast.eta ? (
+                      <>
+                        <Locale
+                          en="Estimated to reach"
+                          zh_hk="預計到達"
+                          zh_cn="预计到达"
+                        />{' '}
+                        <span>{forecast.target}</span>{' '}
+                        <Locale en="around" zh_hk="約在" zh_cn="约在" />{' '}
+                        <span>{formatDateTime(forecast.eta)}</span> (in{' '}
+                        {formatInterval(forecast.eta - Date.now())})
+                      </>
+                    ) : (
+                      <>
+                        <Locale
+                          en="Not decreasing, no estimate to reach"
+                          zh_hk="並非下降中，未能估算到達"
+                          zh_cn="并非下降中，未能估算到达"
+                        />{' '}
+                        <span>{forecast.target}</span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <Locale
+                    en="Not enough data (need at least 2 numeric samples)"
+                    zh_hk="數據不足（需要至少 2 個數值樣本）"
+                    zh_cn="数据不足（需要至少 2 个数值样本）"
+                  />
+                )}
+              </dd>
+              <dt>
+                <Locale en="Value History" zh_hk="數值歷史" zh_cn="数值历史" />
+              </dt>
+              <dd>
+                <div id="value-history-chart">
+                  <Chart
+                    canvas_id="value-history"
+                    data_labels={chart_labels}
+                    datasets={[
+                      {
+                        label: item.extract_field || '$',
+                        data: chart_data,
+                        borderColor: '#2b6cb0',
+                      },
+                      ...(forecast?.next_value != null
+                        ? [
+                            {
+                              label: 'forecast',
+                              data: forecast_data,
+                              borderColor: '#dd6b20',
+                              borderDash: [6, 6],
+                            },
+                          ]
+                        : []),
+                    ]}
+                    borderWidth={2}
+                    beginAtZero
+                  />
+                </div>
+              </dd>
+            </>
+          ) : null}
           <dt>
             <Locale en="Version History" zh_hk="版本歷史" zh_cn="版本历史" />
           </dt>
@@ -744,6 +1038,7 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
         <BackToLink href="/endpoints" title={pageTitle} />
       </div>
       {sweetAlertPlugin.node}
+      {ChartScript}
       {detailPageScript}
     </>
   )
@@ -860,6 +1155,21 @@ function UpdateField(attrs: {}, context: WsContext) {
         let field = value || '$'
         update(proxy.endpoint, { id }, { extract_field: field })
         commitField()
+        throw EarlyTerminate
+      }
+      case 'forecast_samples': {
+        let samples = Math.floor(Number(value))
+        if (!Number.isFinite(samples) || samples < 2) {
+          throw `validation error: forecast samples must be an integer >= 2`
+        }
+        update(proxy.endpoint, { id }, { forecast_samples: samples })
+        commitField([
+          [
+            'update-text',
+            `${container} .field[data-field="forecast_samples"] .view-mode`,
+            String(samples),
+          ],
+        ])
         throw EarlyTerminate
       }
       default:

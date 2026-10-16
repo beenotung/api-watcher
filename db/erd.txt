@@ -157,6 +157,7 @@ user_id integer FK >0- user.id
 min_interval integer
 max_interval integer
 extract_field text NULL
+forecast_samples integer NULL
 
 
 watch_schedule
