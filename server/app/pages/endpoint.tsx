@@ -427,6 +427,20 @@ let detailPageStyle = Style(/* css */ `
 #DetailEndpoint .num {
   text-align: right;
 }
+#DetailEndpoint > dl > dt {
+  margin-block-start: 0.75rem;
+  margin-block-end: 0.25rem;
+  font-weight: bold;
+}
+#DetailEndpoint table {
+  border-collapse: collapse;
+  margin-block: 0.25rem;
+}
+#DetailEndpoint table th,
+#DetailEndpoint table td {
+  border: 1px solid black;
+  padding: 0.25rem 0.5rem;
+}
 `)
 
 let detailPageScript = Script(/* js */ `
