@@ -62,6 +62,31 @@ async function get_credit() {
   return { credit: 'custom logics' }
 }
 
+// 8x8 Connect SMS API (also used for sending in server/sms.ts).
+// Account balance is available for prepaid accounts only.
+// API key: https://connect.8x8.com -> API keys
+async function get_8x8_balance() {
+  let account = process.env.SMS_8x8_ACCOUNT_KEY
+  let api_key = process.env.SMS_8x8_API_KEY
+  if (!account || account === 'skip' || !api_key || api_key === 'skip') {
+    throw new Error('SMS_8x8_ACCOUNT_KEY / SMS_8x8_API_KEY not set in .env')
+  }
+  let res = await fetch(
+    `https://sms.8x8.com/api/v1/accounts/${account}/balance`,
+    {
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer ' + api_key,
+      },
+    },
+  )
+  let json = await res.json()
+  if (!res.ok) {
+    throw new Error('8x8 balance failed: ' + JSON.stringify(json))
+  }
+  return json
+}
+
 let app = express()
 
 function wrap_api(path: string, fn: () => Promise<object>) {
@@ -76,6 +101,8 @@ function wrap_api(path: string, fn: () => Promise<object>) {
 }
 
 wrap_api('/cloud-a/credit', get_credit)
+
+wrap_api('/8x8/balance', get_8x8_balance)
 
 wrap_api('/sms-credit/company-a', async () => {
   let session = await company_a_session_p
