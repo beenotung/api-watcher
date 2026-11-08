@@ -427,6 +427,9 @@ let detailPageStyle = Style(/* css */ `
 #DetailEndpoint .num {
   text-align: right;
 }
+#DetailEndpoint .negative {
+  color: #c53030;
+}
 #DetailEndpoint > dl > dt {
   margin-block-start: 0.75rem;
   margin-block-end: 0.25rem;
@@ -583,11 +586,11 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
     }
 
     let last_point = numeric_history[numeric_history.length - 1]
-    let next_time = forecast?.next_time
-    let span =
-      next_time != null
-        ? next_time - numeric_history[0].poll_time
-        : last_point.poll_time - numeric_history[0].poll_time
+    let forecast_end_time =
+      forecast?.eta ?? forecast?.next_time ?? last_point.poll_time
+    let forecast_end_value =
+      forecast?.eta != null ? forecast.target : forecast?.next_value
+    let span = forecast_end_time - numeric_history[0].poll_time
     let max_slots = 48
     let slot_duration = span > 0 ? span / max_slots : 0
     function pushFiller(from: number, to: number) {
@@ -610,14 +613,29 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
       chart_data.push(point.value)
       forecast_data.push(null)
     }
-    if (next_time != null && forecast?.next_value != null) {
-      let last_reading_index = forecast_data.length - 1
-      pushFiller(last_point.poll_time, next_time)
-      chart_labels.push(formatChartTime(next_time))
-      chart_data.push(null)
-      // connect the forecast line to the last known reading
-      forecast_data[last_reading_index] = forecast.value
-      forecast_data.push(forecast.next_value)
+    if (forecast && forecast_end_value != null) {
+      // connect the dashed line to the last known reading
+      forecast_data[forecast_data.length - 1] = forecast.value
+
+      // mark each horizon forecast, then stop at zero (no negative tail)
+      let forecast_points: { time: number; value: number }[] = []
+      for (let row of forecast_rows) {
+        if (row.time >= forecast_end_time) continue
+        forecast_points.push({ time: row.time, value: row.value })
+      }
+      forecast_points.push({
+        time: forecast_end_time,
+        value: forecast_end_value,
+      })
+
+      let cursor = last_point.poll_time
+      for (let point of forecast_points) {
+        pushFiller(cursor, point.time)
+        chart_labels.push(formatChartTime(point.time))
+        chart_data.push(null)
+        forecast_data.push(point.value)
+        cursor = point.time
+      }
     }
   }
 
@@ -932,7 +950,13 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
                         {mapArray(forecast_rows, row => (
                           <tr>
                             <td>{row.label}</td>
-                            <td class="num">
+                            <td
+                              class={
+                                row.value < forecast.target
+                                  ? 'num negative'
+                                  : 'num'
+                              }
+                            >
                               <pre style="max-width: 400px; overflow: auto;">
                                 {row.value.toFixed(2)}
                               </pre>
@@ -942,6 +966,13 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
                         ))}
                       </tbody>
                     </table>
+                    <p class="hint">
+                      <Locale
+                        en="(negative value = credit shortfall to cover that horizon)"
+                        zh_hk="（負數 = 覆蓋該時距所需的補值）"
+                        zh_cn="（负数 = 覆盖该时距所需的补值）"
+                      />
+                    </p>
                     {forecast.eta ? (
                       <>
                         <Locale
@@ -1039,9 +1070,17 @@ function DetailPage(attrs: { item: Endpoint }, context: DynamicContext) {
                       </pre>
                     </td>
                     <td>
-                      {formatInterval(row.last_poll_time - row.first_poll_time)}
+                      {row.first_poll_time === row.last_poll_time
+                        ? '-'
+                        : formatInterval(
+                            row.last_poll_time - row.first_poll_time,
+                          )}
                     </td>
-                    <td>{formatDateTime(row.first_poll_time)}</td>
+                    <td>
+                      {row.first_poll_time === row.last_poll_time
+                        ? '-'
+                        : formatDateTime(row.first_poll_time)}
+                    </td>
                     <td>{formatDateTime(row.last_poll_time)}</td>
                   </tr>
                 ))}
