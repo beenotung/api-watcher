@@ -3,7 +3,7 @@ import type { NumericPoint } from './extract.js'
 const DAY = 24 * 60 * 60 * 1000
 
 export type Forecast = {
-  /** slope of the fitted line, in value change per day (negative means decreasing) */
+  /** steepest decline in the window, in value change per day (worst case) */
   rate_per_day: number
   /** latest known value */
   value: number
@@ -24,41 +24,15 @@ export type Forecast = {
 }
 
 /**
- * Fit a straight line to the given points and return a projector.
+ * Forecast a numeric series from its last `samples` points (default 2).
+ *
+ * The rate is the steepest decline between consecutive readings in that
+ * window, so the zero-crossing is a worst-case (earliest) estimate that
+ * leaves time to react. With a single segment (two points) that segment is
+ * used as-is; with only one point there is nothing to extrapolate.
  *
  * The x axis is the real time in days, so irregular sampling gaps are
  * handled correctly (a long gap is a long Δt, not "one step").
- */
-function fitLine(samples: NumericPoint[]) {
-  let n = samples.length
-  let t0 = samples[0].poll_time
-  let sum_x = 0
-  let sum_y = 0
-  let sum_xx = 0
-  let sum_xy = 0
-  for (let { poll_time, value } of samples) {
-    let x = (poll_time - t0) / DAY
-    sum_x += x
-    sum_y += value
-    sum_xx += x * x
-    sum_xy += x * value
-  }
-  let denominator = n * sum_xx - sum_x * sum_x
-  if (denominator === 0) return null
-  let slope = (n * sum_xy - sum_x * sum_y) / denominator // per day
-  let intercept = (sum_y - slope * sum_x) / n
-  function project(time: number): number {
-    return intercept + slope * ((time - t0) / DAY)
-  }
-  return { slope, project }
-}
-
-/**
- * Forecast a numeric series from its last `samples` points (default 2).
- *
- * This is direction-agnostic: it reports the current rate and the projected
- * value at the next sample, and only computes an `eta` when the series is
- * actually decreasing towards the target (default 0).
  */
 export function forecastToTarget(
   points: NumericPoint[],
@@ -69,23 +43,33 @@ export function forecastToTarget(
   if (points.length < 2) return null
 
   let samples = points.slice(-sample_count)
-  let fitted = fitLine(samples)
-  if (!fitted) return null
+
+  // worst case: the steepest decline between consecutive readings
+  let worst_rate = 0
+  for (let i = 1; i < samples.length; i++) {
+    let days = (samples[i].poll_time - samples[i - 1].poll_time) / DAY
+    if (days <= 0) continue
+    let rate = (samples[i].value - samples[i - 1].value) / days
+    if (rate < worst_rate) worst_rate = rate
+  }
 
   let last = samples[samples.length - 1]
-  let fitted_value = fitted.project(last.poll_time)
+  let project = (time: number) =>
+    last.value + worst_rate * ((time - last.poll_time) / DAY)
 
   let eta: number | null = null
-  if (fitted.slope < 0 && fitted_value > target) {
-    let days_to_target = (fitted_value - target) / -fitted.slope
-    eta = last.poll_time + days_to_target * DAY
+  if (worst_rate < 0 && last.value > target) {
+    eta = last.poll_time + ((last.value - target) / -worst_rate) * DAY
   }
 
   let next_time = options.next_time ?? null
-  let next_value = next_time == null ? null : fitted.project(next_time)
+  let next_value: number | null = null
+  if (next_time != null) {
+    next_value = Math.max(project(next_time), target)
+  }
 
   return {
-    rate_per_day: fitted.slope,
+    rate_per_day: worst_rate,
     value: last.value,
     poll_time: last.poll_time,
     next_value,
@@ -93,6 +77,6 @@ export function forecastToTarget(
     eta,
     target,
     sample_size: samples.length,
-    project: fitted.project,
+    project,
   }
 }
