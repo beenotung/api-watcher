@@ -371,6 +371,14 @@ function parseForecastSamples(text: string): number | null {
   return Number.isFinite(samples) && samples >= 2 ? samples : null
 }
 
+/** keep min_interval <= max_interval, swapping the two when they are reversed */
+function ensureIntervalOrder(
+  a: number,
+  b: number,
+): [min_interval: number, max_interval: number] {
+  return a <= b ? [a, b] : [b, a]
+}
+
 function Submit(attrs: {}, context: DynamicContext) {
   try {
     let throws = makeThrows(context)
@@ -384,13 +392,17 @@ function Submit(attrs: {}, context: DynamicContext) {
     let user_id = user!.id!
     let body = getContextFormBody(context)
     let input = submitParser.parse(body)
+    let [min_interval, max_interval] = ensureIntervalOrder(
+      parseInterval(input.min_interval),
+      parseInterval(input.max_interval),
+    )
     let id = proxy.endpoint.push({
       title: input.title,
       desc: input.desc ?? '',
       code: input.code,
       user_id,
-      min_interval: parseInterval(input.min_interval),
-      max_interval: parseInterval(input.max_interval),
+      min_interval,
+      max_interval,
       extract_field: input.extract_field || '$',
       forecast_samples: parseForecastSamples(input.forecast_samples),
     })
@@ -1180,12 +1192,22 @@ function UpdateField(attrs: {}, context: WsContext) {
       }
       case 'min_interval': {
         let interval = parseInterval(value)
-        update(proxy.endpoint, { id }, { min_interval: interval })
+        let endpoint = proxy.endpoint[id]
+        let [min_interval, max_interval] = ensureIntervalOrder(
+          interval,
+          endpoint.max_interval,
+        )
+        update(proxy.endpoint, { id }, { min_interval, max_interval })
         commitField([
           [
             'update-text',
             `${container} .field[data-field="min_interval"] .view-mode`,
-            formatInterval(Number(value)),
+            formatInterval(min_interval),
+          ],
+          [
+            'update-text',
+            `${container} .field[data-field="max_interval"] .view-mode`,
+            formatInterval(max_interval),
           ],
         ])
         checkSchedule(proxy.endpoint[id])
@@ -1193,12 +1215,22 @@ function UpdateField(attrs: {}, context: WsContext) {
       }
       case 'max_interval': {
         let interval = parseInterval(value)
-        update(proxy.endpoint, { id }, { max_interval: interval })
+        let endpoint = proxy.endpoint[id]
+        let [min_interval, max_interval] = ensureIntervalOrder(
+          endpoint.min_interval,
+          interval,
+        )
+        update(proxy.endpoint, { id }, { min_interval, max_interval })
         commitField([
           [
             'update-text',
+            `${container} .field[data-field="min_interval"] .view-mode`,
+            formatInterval(min_interval),
+          ],
+          [
+            'update-text',
             `${container} .field[data-field="max_interval"] .view-mode`,
-            formatInterval(Number(value)),
+            formatInterval(max_interval),
           ],
         ])
         checkSchedule(proxy.endpoint[id])

@@ -75,14 +75,31 @@ export function getSchedule(endpoint: Endpoint) {
   return { schedule, time_to_wait }
 }
 
+let scheduleTimers = new Map<number, ReturnType<typeof setTimeout>>()
+
+function clearScheduleTimer(endpoint: Endpoint) {
+  let endpoint_id = endpoint.id!
+  let timer = scheduleTimers.get(endpoint_id)
+  if (timer) {
+    clearTimeout(timer)
+    scheduleTimers.delete(endpoint_id)
+  }
+}
+
 export function checkSchedule(endpoint: Endpoint) {
+  let endpoint_id = endpoint.id!
+  // drop previous timer to avoid duplicated polling loops
+  clearScheduleTimer(endpoint)
+
   let { schedule, time_to_wait } = getSchedule(endpoint)
 
   if (time_to_wait > 0) {
     // not yet time to poll
-    setTimeout(() => {
+    let timer = setTimeout(() => {
+      scheduleTimers.delete(endpoint_id)
       checkSchedule(endpoint)
     }, time_to_wait)
+    scheduleTimers.set(endpoint_id, timer)
     return
   }
 
@@ -91,6 +108,7 @@ export function checkSchedule(endpoint: Endpoint) {
 }
 
 export function resetSchedule(endpoint: Endpoint) {
+  clearScheduleTimer(endpoint)
   let { schedule } = getSchedule(endpoint)
   schedule.poll_time = Date.now()
   poll(schedule)
